@@ -1,0 +1,117 @@
+import CoreGraphics
+import Foundation
+
+/// 队列里的一个输入文件。
+///
+/// 只描述「是什么」，不携带任何 UI 状态；界面状态由 App 层包一层。
+public struct SourceDocument: Identifiable, Sendable, Equatable {
+    public let id: UUID
+    public let url: URL
+    public let kind: InputKind
+    /// PDF 的页数；图片为 1；文档在转换前未知，为 0。
+    public var pageCount: Int
+    /// PDF 首页的显示尺寸（点）或图片的像素尺寸。
+    public var size: CGSize
+    public var byteSize: Int64
+    /// 已知的页面尺寸集合为空时，用这个值做预估。
+    public var displayName: String
+
+    public init(
+        id: UUID = UUID(),
+        url: URL,
+        kind: InputKind,
+        pageCount: Int = 0,
+        size: CGSize = .zero,
+        byteSize: Int64 = 0,
+        displayName: String? = nil
+    ) {
+        self.id = id
+        self.url = url
+        self.kind = kind
+        self.pageCount = pageCount
+        self.size = size
+        self.byteSize = byteSize
+        self.displayName = displayName ?? url.deletingPathExtension().lastPathComponent
+    }
+
+    /// 输入是从文件系统读来的，这里只取元信息，不做解码。
+    public static func make(from url: URL) -> SourceDocument {
+        let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
+        let size = (attributes?[.size] as? NSNumber)?.int64Value ?? 0
+        return SourceDocument(
+            url: url,
+            kind: InputKind.detect(url: url),
+            byteSize: size
+        )
+    }
+}
+
+/// 单个文件的转换结果。
+public struct ConversionResult: Sendable {
+    public let documentID: UUID
+    public let outputFiles: [URL]
+    public let outputFolder: URL?
+    /// 实际写出的张数 / 页数。
+    public let producedCount: Int
+    public let error: ConversionError?
+    public let duration: TimeInterval
+
+    public var isSuccess: Bool { error == nil }
+
+    public init(
+        documentID: UUID,
+        outputFiles: [URL] = [],
+        outputFolder: URL? = nil,
+        producedCount: Int = 0,
+        error: ConversionError? = nil,
+        duration: TimeInterval = 0
+    ) {
+        self.documentID = documentID
+        self.outputFiles = outputFiles
+        self.outputFolder = outputFolder
+        self.producedCount = producedCount
+        self.error = error
+        self.duration = duration
+    }
+}
+
+/// 转换进度回调。所有回调都在工作线程被调用，调用方负责切回主线程。
+public struct ConversionProgress: Sendable {
+    /// 当前文件已完成的页数 / 张数。
+    public let completedUnits: Int
+    /// 当前文件的总页数 / 张数。
+    public let totalUnits: Int
+    /// 正在处理第几个文件（0 基）。
+    public let fileIndex: Int
+    public let fileCount: Int
+    /// 0–1 的整体进度。
+    public var fraction: Double {
+        guard fileCount > 0 else { return 0 }
+        let perFile = 1.0 / Double(fileCount)
+        let within = totalUnits > 0 ? Double(completedUnits) / Double(totalUnits) : 0
+        return min(1, Double(fileIndex) * perFile + within * perFile)
+    }
+
+    public init(completedUnits: Int, totalUnits: Int, fileIndex: Int, fileCount: Int) {
+        self.completedUnits = completedUnits
+        self.totalUnits = totalUnits
+        self.fileIndex = fileIndex
+        self.fileCount = fileCount
+    }
+}
+
+/// 转换进度与结果的回调集合。
+public struct ConversionObserver: Sendable {
+    public var onProgress: (@Sendable (ConversionProgress) -> Void)?
+    public var onFileFinished: (@Sendable (ConversionResult) -> Void)?
+
+    public init(
+        onProgress: (@Sendable (ConversionProgress) -> Void)? = nil,
+        onFileFinished: (@Sendable (ConversionResult) -> Void)? = nil
+    ) {
+        self.onProgress = onProgress
+        self.onFileFinished = onFileFinished
+    }
+
+    public static let none = ConversionObserver()
+}

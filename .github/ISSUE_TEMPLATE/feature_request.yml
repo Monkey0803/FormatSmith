@@ -1,0 +1,30 @@
+name: Feature request
+description: Suggest a new capability or an improvement
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please check the roadmap in the README first — the conversion directions that are planned are
+        already listed there. Video and audio conversion is out of scope.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: Describe the task, not the implementation.
+      placeholder: I need to send scanned pages as a single PDF to a printer.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would the ideal behaviour look like?
+    validations:
+      required: false
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What do you use today?
+      description: Existing tools, workarounds, or why they are not good enough.
+    validations:
+      required: false

@@ -1,0 +1,69 @@
+name: Bug report
+description: Something does not work the way it should
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Please do not attach confidential documents — a minimal file that
+        reproduces the problem is far more useful than a large one.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what actually happened?
+      placeholder: I converted a 3-page PDF to PNG and page 2 came out blank.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Drag report.pdf into the window
+        2. Choose TIFF, 300 DPI
+        3. Click Convert Now
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: FormatSmith version
+      description: Shown in the app's About panel, or run `--version` in the CLI.
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: "14.5 (23F79)"
+    validations:
+      required: true
+  - type: dropdown
+    id: how
+    attributes:
+      label: How were you using it?
+      options:
+        - The app window
+        - The command line
+        - "Open With / dragging onto the Dock icon"
+    validations:
+      required: true
+  - type: textarea
+    id: source-file
+    attributes:
+      label: About the input file
+      description: Page count, whether the pages are rotated, whether the PDF is encrypted, where it came from.
+    validations:
+      required: false
+  - type: textarea
+    id: debug-log
+    attributes:
+      label: Debug log (optional)
+      description: |
+        Run `FORMATSMITH_DEBUG=1 dist/FormatSmith.app/Contents/MacOS/FormatSmith --convert your.pdf …`
+        and paste the output.
+      render: shell
+    validations:
+      required: false

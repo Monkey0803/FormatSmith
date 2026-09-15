@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "indentation": {
+    "spaces": 4
+  },
+  "lineLength": 120,
+  "maximumBlankLines": 1,
+  "respectsExistingLineBreaks": true,
+  "lineBreakBeforeControlFlowKeywords": false,
+  "lineBreakBeforeEachArgument": false,
+  "multiElementCollectionTrailingCommas": true,
+  "reflowMultilineStringLiterals": "never",
+  "orderedImports": {
+    "shouldGroupImports": true,
+    "includeConditionalImports": false
+  },
+  "rules": {
+    "AllPublicDeclarationsHaveDocumentation": false,
+    "BeginDocumentationCommentWithOneLineSummary": false,
+    "AlwaysUseLiteralForEmptyCollectionInit": false,
+    "UseEarlyExits": false,
+    "NoBlockComments": false,
+    "ReplaceForEachWithForLoop": false
+  }
+}

@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags-ignore: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    name: Build, lint and test
+    # macos-latest currently resolves to macOS 26 on arm64. Pin the image so a
+    # `-latest` migration cannot change the toolchain underneath us.
+    runs-on: macos-26
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          swift --version
+          sw_vers
+
+      - name: Build (release)
+        run: swift build -c release
+
+      - name: Check formatting
+        run: swift format lint --configuration .swift-format --strict --recursive Sources Tests
+
+      - name: Run tests
+        run: swift test
+
+      - name: Assemble the app bundle
+        run: ./scripts/build-app.sh
+
+      - name: Verify the bundle contents
+        run: |
+          APP=dist/FormatSmith.app
+          test -x "$APP/Contents/MacOS/FormatSmith"
+          test -f "$APP/Contents/Info.plist"
+          test -f "$APP/Contents/Resources/AppIcon.icns"
+          test -f "$APP/Contents/Resources/zh-Hans.lproj/Localizable.strings"
+          APP_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")"
+          REPO_VERSION="$(tr -d '[:space:]' < VERSION)"
+          echo "bundle version: $APP_VERSION / VERSION file: $REPO_VERSION"
+          test "$APP_VERSION" = "$REPO_VERSION"
+
+      - name: CLI smoke test
+        run: ./scripts/smoke-test-cli.sh
+
+      - name: Keep the bundle for inspection when something fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: FormatSmith-app
+          path: dist/FormatSmith.app
+          if-no-files-found: ignore
+          retention-days: 7
