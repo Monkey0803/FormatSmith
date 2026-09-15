@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-09-15
+
 ### Added
 
 - Presets: Web (2× PNG), Email, Print (300 DPI TIFF), Archive, and Scanned PDF, each setting format,
@@ -85,4 +87,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as output formats. Their size rules are undocumented and inconsistent; ICNS, for example, rejects
   64×64 and 1024×1024 while accepting 48×48.
 
-[Unreleased]: https://github.com/Monkey0803/FormatSmith/commits/main
+[Unreleased]: https://github.com/Monkey0803/FormatSmith/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/Monkey0803/FormatSmith/releases/tag/v1.0.0

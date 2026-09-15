@@ -1,5 +1,10 @@
 # FormatSmith
 
+[![CI](https://github.com/Monkey0803/FormatSmith/actions/workflows/ci.yml/badge.svg)](https://github.com/Monkey0803/FormatSmith/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/Monkey0803/FormatSmith)](https://github.com/Monkey0803/FormatSmith/releases/latest)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+![Platform: macOS 14+](https://img.shields.io/badge/Platform-macOS%2014%2B-lightgrey)
+
 **A native macOS file converter.** Drop files in, pick an output format, done. Everything runs
 locally through Apple's own frameworks — nothing is uploaded, and there is no third-party dependency
 in the app itself.
@@ -57,6 +62,9 @@ cd FormatSmith
 
 Then open FormatSmith from `~/Applications` (or Spotlight). Prefer to run it from the build
 directory? `./scripts/build-app.sh` leaves the bundle at `dist/FormatSmith.app`.
+
+Prefer a download? Grab the DMG from the [latest release](https://github.com/Monkey0803/FormatSmith/releases/latest)
+and drag FormatSmith into Applications.
 
 Because these builds are ad-hoc signed rather than notarized, macOS warns on first launch. Right-click
 the app, choose **Open**, then confirm. You only have to do this once.

@@ -1,0 +1,79 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to build (must match the VERSION file, e.g. 1.0.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build the DMG and publish a release
+    runs-on: macos-26
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Work out the version
+        id: version
+        run: |
+          REPO_VERSION="$(tr -d '[:space:]' < VERSION)"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG_VERSION="${{ github.event.inputs.version }}"
+          else
+            TAG_VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          echo "VERSION file: $REPO_VERSION / requested: $TAG_VERSION"
+          if [ "$REPO_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::VERSION ($REPO_VERSION) does not match the requested version ($TAG_VERSION)."
+            exit 1
+          fi
+          echo "version=$REPO_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Show toolchain
+        run: swift --version
+
+      - name: Run the test suite before shipping anything
+        run: swift test
+
+      - name: Build a universal app bundle and a DMG
+        run: ./scripts/build-app.sh --universal --dmg
+
+      - name: Verify the DMG
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          DMG="dist/FormatSmith-$VERSION.dmg"
+          test -f "$DMG" || { echo "::error::$DMG was not produced"; exit 1; }
+          # 挂载一次，确认里面确实有应用和 /Applications 软链
+          MOUNT="$(mktemp -d)"
+          hdiutil attach "$DMG" -mountpoint "$MOUNT" -nobrowse -quiet
+          test -d "$MOUNT/FormatSmith.app" || { echo "::error::no app inside the DMG"; exit 1; }
+          test -L "$MOUNT/Applications" || { echo "::error::no /Applications link inside the DMG"; exit 1; }
+          # 趁着还挂着，确认是可双击的通用二进制
+          ARCHS="$(lipo -archs "$MOUNT/FormatSmith.app/Contents/MacOS/FormatSmith")"
+          echo "architectures: $ARCHS"
+          case "$ARCHS" in
+            *arm64*x86_64*|*x86_64*arm64*) ;;
+            *) echo "::error::expected a universal binary, got: $ARCHS"; exit 1 ;;
+          esac
+          hdiutil detach "$MOUNT" -quiet
+          cat "dist/FormatSmith-$VERSION.dmg.sha256"
+
+      - name: Publish
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          gh release create "$GITHUB_REF_NAME" \
+            "dist/FormatSmith-$VERSION.dmg" \
+            "dist/FormatSmith-$VERSION.dmg.sha256" \
+            --title "FormatSmith $VERSION" \
+            --generate-notes
