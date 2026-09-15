@@ -90,19 +90,24 @@ if f"## [{version}]" not in text:
 open(path, "w", encoding="utf-8").write(text)
 PY
 
-echo "▶ Committing and tagging…"
+# 用「最近一次提交的作者」作为发布提交与 tag 的身份。
+# 直接用 git config 里的身份有风险：如果那里配的是真实邮箱，而账号开启了
+# 「阻止暴露私人邮箱」，GitHub 会直接拒绝推送 tag。
+AUTHOR_NAME="$(git log -1 --format='%an')"
+AUTHOR_EMAIL="$(git log -1 --format='%ae')"
+echo "▶ Committing and tagging as ${AUTHOR_NAME} <${AUTHOR_EMAIL}>…"
 git add VERSION CHANGELOG.md
 if git diff --cached --quiet; then
     # VERSION 与 CHANGELOG 已经是这个版本了（例如手工改过），直接打 tag。
     echo "  VERSION and CHANGELOG already at $VERSION; nothing to commit"
 else
-    git commit -q -m "chore(release): 发布 $VERSION
+    git -c user.name="$AUTHOR_NAME" -c user.email="$AUTHOR_EMAIL" commit -q -m "chore(release): 发布 $VERSION
 
 - 将 VERSION 提升到 $VERSION
 - 在 CHANGELOG 中固化 $VERSION 的发布条目
 "
 fi
-git tag -a "v$VERSION" -m "$APP_NAME $VERSION"
+git -c user.name="$AUTHOR_NAME" -c user.email="$AUTHOR_EMAIL" tag -a "v$VERSION" -m "$APP_NAME $VERSION"
 
 echo "▶ Pushing main and the tag…"
 git push origin main
