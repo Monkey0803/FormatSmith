@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- An in-app language switch (English / Simplified Chinese / follow system) in the settings panel and
+  the menu bar. It applies immediately without a restart, and the choice is remembered.
+- `--check-localization` to see how interface strings resolve per language, and a test that fails CI
+  when a string used in the code has no Chinese translation.
+
 - Presets: Web (2× PNG), Email, Print (300 DPI TIFF), Archive, and Scanned PDF, each setting format,
   resolution, quality and background in one click.
 - Parallel conversion: `ConversionEngine.convertBatch` runs several files at once, capped at 4 by

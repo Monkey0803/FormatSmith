@@ -241,6 +241,21 @@ echo "▶ Dependency reporting…"
 expect_exit 0 $? "--check-dependencies"
 if grep -q "LibreOffice" "$WORK/deps.txt"; then pass "reports LibreOffice status"; else fail "no LibreOffice line in --check-dependencies"; fi
 
+echo "▶ Localization…"
+LOC="$WORK/localization.txt"
+"$BIN" --check-localization > "$LOC" 2>&1
+expect_exit 0 $? "--check-localization"
+
+if grep -q "zh-Hans" "$LOC"; then pass "reports the bundled languages"; else fail "no zh-Hans in --check-localization"; fi
+# 中文与英文必须解析出不同结果，否则语言包根本没生效
+CN_LINE="$(grep -A1 "^简体中文" "$LOC" | tail -1)"
+EN_LINE="$(grep -A1 "^English" "$LOC" | tail -1)"
+if [ "$CN_LINE" != "$EN_LINE" ] && printf '%s' "$CN_LINE" | grep -q "输出格式"; then
+    pass "Chinese strings resolve differently from English"
+else
+    fail "localization did not resolve: cn='${CN_LINE}' en='${EN_LINE}'"
+fi
+
 echo "▶ Error handling…"
 "$BIN" --convert "$WORK/does-not-exist.pdf" --format png --out "$WORK/none" >/dev/null 2>&1
 expect_exit 1 $? "missing input file"

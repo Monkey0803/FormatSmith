@@ -32,6 +32,7 @@ struct ConversionSettingsPanel: View {
                 }
                 outputSection
                 previewSection
+                languageSection
             }
             .padding(16)
         }
@@ -665,6 +666,30 @@ struct ConversionSettingsPanel: View {
                     .pickerStyle(.segmented)
                 }
             }
+        }
+    }
+
+    // MARK: 语言
+
+    private var languageSection: some View {
+        SettingsCard(title: Localized.text("Language"), systemImage: "character.bubble") {
+            Picker(
+                "",
+                selection: Binding(
+                    get: { model.language },
+                    set: { model.language = $0 }
+                )
+            ) {
+                ForEach(AppLanguage.allCases) { language in
+                    Text(language.displayName).tag(language)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.segmented)
+
+            Text(Localized.text("Switches immediately; no restart needed."))
+                .font(.system(size: 11))
+                .foregroundStyle(.tertiary)
         }
     }
 

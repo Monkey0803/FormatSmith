@@ -20,6 +20,9 @@ struct FormatSmithApp: App {
                 .environmentObject(model)
                 .frame(minWidth: 940, minHeight: 600)
                 .onAppear { appDelegate.model = model }
+                // 切换语言时换掉 id，强制重建整棵视图树，
+                // 这样所有 Localized.text(...) 都会重新求值，不需要重启应用。
+                .id("root-\(model.language.rawValue)")
         }
         .defaultSize(width: 1040, height: 680)
         .windowResizability(.contentMinSize)
@@ -32,6 +35,17 @@ struct FormatSmithApp: App {
                 Button(Localized.text("Clear List")) { model.removeAll() }
                     .keyboardShortcut("k", modifiers: [.command, .shift])
                     .disabled(model.items.isEmpty || model.isConverting)
+            }
+            CommandMenu(Localized.text("Language")) {
+                // 读一次 language，让菜单在切换语言后也跟着重建
+                let active = model.language
+                ForEach(AppLanguage.allCases) { candidate in
+                    Button {
+                        model.language = candidate
+                    } label: {
+                        Text(candidate == active ? "✓ \(candidate.displayName)" : candidate.displayName)
+                    }
+                }
             }
             CommandMenu(Localized.text("Convert")) {
                 Button(Localized.text("Convert Now")) { model.startConversion() }

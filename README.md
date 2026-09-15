@@ -39,6 +39,8 @@ in the app itself.
 - **Documents → PDF**: Office, OpenDocument and RTF through a LibreOffice you already have; HTML,
   Markdown and plain text through the system WebKit, with no extra installation. Markdown uses pandoc
   when it is around and falls back to a built-in renderer when it is not.
+- **English and Simplified Chinese**, switchable in the app (*Language* in the settings panel or the
+  menu bar) and applied immediately — no restart. The default is to follow the system language.
 - **A real CLI** in the same binary, for scripts and batch jobs. Its output stays in English
   regardless of system language, so scripts can rely on it.
 
@@ -117,6 +119,7 @@ dist/FormatSmith.app/Contents/MacOS/FormatSmith --list-formats
 | `--split-every <n>` | Pages per file when splitting |
 | `--rotate <deg>` | `90`, `180`, or `270` |
 | `--check-dependencies` | Report whether LibreOffice and pandoc were found |
+| `--check-localization` | Show how interface strings resolve in each language |
 | `--list-formats` | List output formats available on this Mac |
 | `--version`, `--help` | Version / usage |
 
@@ -201,6 +204,21 @@ Two features can use tools you may already have. Nothing is bundled, and nothing
 
 `--check-dependencies` reports what was found, and the app shows a **Missing tools** card with a
 copyable `brew install` command when a queued file needs something you do not have.
+
+## Languages
+
+English is the source language and every user-facing string is written in it. Simplified Chinese is
+translated in `Resources/i18n/zh-Hans.lproj/Localizable.strings`. Pick a language in the app's
+**Language** card or from the **Language** menu; it applies immediately, without a restart, and is
+remembered next time.
+
+`swift test` includes a check that every string used in the code has a Chinese translation, so a
+missing one fails CI rather than quietly showing English in the middle of a Chinese window.
+
+> Translating into another language is mostly mechanical: copy
+> `Resources/i18n/zh-Hans.lproj/Localizable.strings`, translate the values (the keys are the English
+> source text and must not change), add the language to `AppLanguage`, and give the build script's
+> `Resources/i18n/*.lproj` glob nothing special to do — it already copies every `.lproj` it finds.
 
 ## Known limitations
 

@@ -84,6 +84,7 @@
 "Finished with %d failure(s)." = "完成，其中 %d 个文件失败。";
 "Finished: %d file(s) → %@" = "完成：%d 个文件 → %@";
 "First file" = "首个文件";
+"Follow system" = "跟随系统";
 "For images, 72 DPI means the original pixel size." = "对图片而言，72 DPI 等于原始像素尺寸。";
 "Ignored unsupported file: %@" = "已忽略不支持的文件：%@";
 "Images" = "图片";
@@ -94,6 +95,7 @@
 "JPEG, small enough to attach" = "JPEG，体积适合邮件附件";
 "Join several PDFs into one document." = "把多个 PDF 首尾相接合成一个文档。";
 "Keep only the pages you list." = "只保留你列出的页面。";
+"Language" = "语言";
 "Lossless" = "无损";
 "Lossy" = "有损";
 "Margin" = "页边距";
@@ -149,6 +151,7 @@
 "Split" = "拆分";
 "Subfolder per source file" = "每个源文件单独建子文件夹";
 "Supports transparency" = "支持透明";
+"Switches immediately; no restart needed." = "切换后立即生效，无需重启。";
 "TIFF at 300 DPI, lossless" = "300 DPI 无损 TIFF";
 "Text" = "文本";
 "The computed output size is invalid. Lower the resolution." = "计算出的尺寸无效，请降低分辨率。";

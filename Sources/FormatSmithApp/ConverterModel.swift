@@ -48,6 +48,15 @@ final class ConverterModel: ObservableObject {
     @Published var lastOutputFolder: URL?
     /// 是否展开长尾格式。
     @Published var showsAllFormats = false
+    /// 界面语言。改动会立刻生效（根视图用它的值做 id，从而重建整棵视图树）。
+    @Published var language: AppLanguage {
+        didSet {
+            Localized.language = language
+            UserDefaults.standard.set(language.rawValue, forKey: Self.languageKey)
+        }
+    }
+
+    static let languageKey = "FormatSmith.language"
 
     private let cancellation = CancellationFlag()
     /// 每个正在转换的文件内部的进度，用于并发时合成整体进度。
@@ -55,6 +64,15 @@ final class ConverterModel: ObservableObject {
     private let defaultsKey = "FormatSmith.settings.v2"
 
     init() {
+        // 语言要在任何界面构建之前确定下来。
+        let stored = UserDefaults.standard.string(forKey: Self.languageKey)
+        let resolved = stored.flatMap(AppLanguage.init(rawValue:)) ?? .system
+        language = resolved
+        Localized.language = resolved
+        DebugLog.log(
+            "language: \(resolved.rawValue) (bundled: \(Localized.bundledLanguages().joined(separator: ", ")))"
+        )
+
         if let data = UserDefaults.standard.data(forKey: defaultsKey),
             let decoded = try? JSONDecoder().decode(ConversionSettings.self, from: data)
         {

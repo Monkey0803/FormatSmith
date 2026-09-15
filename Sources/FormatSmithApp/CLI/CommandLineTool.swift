@@ -19,6 +19,7 @@ enum CommandLineTool {
             || arguments.contains("--help") || arguments.contains("-h")
             || arguments.contains("--list-formats")
             || arguments.contains("--check-dependencies")
+            || arguments.contains("--check-localization")
             || arguments.contains("--version")
         guard wantsCLI else { return }
 
@@ -165,6 +166,10 @@ enum CommandLineTool {
 
             case "--check-dependencies":
                 printDependencies()
+                return 0
+
+            case "--check-localization":
+                printLocalization()
                 return 0
 
             case "--version":
@@ -377,6 +382,18 @@ enum CommandLineTool {
         print("\nWithout them: HTML, Markdown and plain text still convert (rendered by WebKit).")
     }
 
+    private static func printLocalization() {
+        // 用来确认应用包里确实带上了语言包，也方便翻译者核对。
+        print("Languages bundled in this build: \(Localized.bundledLanguages().joined(separator: ", "))")
+        let samples = ["Output format", "Merge", "Compress", "Missing tools", "Follow system"]
+        for language in AppLanguage.allCases {
+            print("\n\(language.displayName) [\(language.rawValue)]")
+            for key in samples {
+                print("  \(key)  →  \(Localized.resolve(key, in: language))")
+            }
+        }
+    }
+
     private static func printUsage() {
         print(
             """
@@ -413,6 +430,7 @@ enum CommandLineTool {
               --merge / --no-merge  Merge several images into one PDF (default: merge)
               --list-formats        List available output formats
               --check-dependencies  Report external tools (LibreOffice, pandoc)
+              --check-localization  Show how interface strings resolve per language
               --version             Print version
               --help                Show this help
 
