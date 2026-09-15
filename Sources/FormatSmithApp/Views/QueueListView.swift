@@ -164,6 +164,9 @@ struct QueueRowView: View {
             } label: {
                 Image(systemName: "xmark.circle.fill")
                     .foregroundStyle(.tertiary)
+                    // 图标本身只有十几个点，撑一圈内边距把命中区域做大
+                    .padding(5)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .disabled(model.isConverting)
@@ -272,6 +275,7 @@ struct QueueRowView: View {
                 .font(.system(size: 10, weight: .semibold))
                 .padding(.horizontal, 7)
                 .padding(.vertical, 3)
+                .contentShape(Capsule())
                 .background(Capsule().fill(Color.green.opacity(0.16)))
                 .foregroundStyle(Color.green)
             }

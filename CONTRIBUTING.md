@@ -104,6 +104,19 @@ Views that only pass already-resolved strings to a child do not need it. For tex
 rather than recomputed each render (like the status line), store a `StatusMessage` (key + typed
 arguments) and call `resolved()` in the view.
 
+## Clickable controls
+
+SwiftUI only hit-tests what a view actually draws. Two traps we have already been bitten by:
+
+- `.frame(maxWidth: .infinity)` creates transparent space that is **not** clickable. Wrap the label
+  in `.contentShape(Rectangle())` if the whole cell should respond.
+- A `.background(...)` applied *outside* the `Button` does not extend the button's hit area; one
+  applied to the label does.
+
+Both are covered by `FormatSmithAppTests/HitAreaTests.swift`, which clicks the real view in a real
+window and checks the action fired — so a regression fails CI. Use `ChipButtonStyle` for anything
+that should behave like a tile or a chip rather than rebuilding the pattern.
+
 ## Commits and pull requests
 
 - Keep commits focused; one logical change per commit.

@@ -26,5 +26,11 @@ let package = Package(
             dependencies: ["FormatSmithCore"],
             path: "Tests/FormatSmithCoreTests"
         ),
+        // 界面层的测试：目前只覆盖「点击区域」这类能无头验证的行为。
+        .testTarget(
+            name: "FormatSmithAppTests",
+            dependencies: ["FormatSmith"],
+            path: "Tests/FormatSmithAppTests"
+        ),
     ]
 )

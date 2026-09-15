@@ -44,7 +44,11 @@ final class ConverterModel: ObservableObject {
     }
     @Published var isConverting = false
     @Published var overallProgress: Double = 0
-    @Published var status: StatusMessage = .idle
+    @Published var status: StatusMessage = .idle {
+        didSet {
+            if status != oldValue { DebugLog.log("status: \(status.key)") }
+        }
+    }
     @Published var lastOutputFolder: URL?
     /// 是否展开长尾格式。
     @Published var showsAllFormats = false
@@ -205,6 +209,7 @@ final class ConverterModel: ObservableObject {
         preset.apply(to: &updated)
         settings = updated
         status = StatusMessage("Applied preset: %@", preset.name)
+        DebugLog.log("applied preset: \(preset.id)")
     }
 
     /// 当前设置是否正好等于某个预设。

@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A test target for the app itself (`FormatSmithAppTests`), starting with hit-area tests: they place a
+  real view in a real window, dispatch real mouse events, and assert the action fires. Those tests
+  fail against the previous implementation and pass against the fixed one.
+
 - An in-app language switch (English / Simplified Chinese / follow system) in the settings panel and
   the menu bar. It applies immediately without a restart, and the choice is remembered.
 - `--check-localization` to see how interface strings resolve per language, and a test that fails CI
@@ -77,6 +81,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Preset tiles only responded when you clicked the icon or the text.** Two separate causes, both
+  fixed: a background applied *outside* the `Button` does not extend its hit area, and the transparent
+  space from `.frame(maxWidth: .infinity)` is not hit-testable without an explicit `contentShape`.
+  Clicking the gap between the icon and the label — the middle of the tile — did nothing at all.
+  The same applies to the DPI/scale chips, which shared the pattern.
+- The remove (×) button in the queue had a hit area of about 10pt, the size of the glyph. It now has
+  padding and an explicit shape, roughly doubling the target.
 - **The language switch did nothing.** `CommandLineTool.runIfNeeded()` forced English *before*
   checking whether the process was actually a command-line invocation, and the app calls it on every
   launch — so the graphical app pinned every string to the English source text. The check now happens

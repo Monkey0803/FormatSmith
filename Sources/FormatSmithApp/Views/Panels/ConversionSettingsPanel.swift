@@ -61,27 +61,9 @@ struct ConversionSettingsPanel: View {
                 spacing: 6
             ) {
                 ForEach(PresetLibrary.all) { preset in
-                    let selected = model.matches(preset)
-                    Button {
+                    PresetButton(preset: preset, isSelected: model.matches(preset)) {
                         model.apply(preset)
-                    } label: {
-                        VStack(spacing: 3) {
-                            Image(systemName: preset.systemImage)
-                                .font(.system(size: 13))
-                            Text(preset.name)
-                                .font(.system(size: 11, weight: .medium))
-                                .lineLimit(1)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 6)
                     }
-                    .buttonStyle(.plain)
-                    .background(
-                        RoundedRectangle(cornerRadius: 7, style: .continuous)
-                            .fill(selected ? Color.accentColor.opacity(0.85) : Color.secondary.opacity(0.12))
-                    )
-                    .foregroundStyle(selected ? Color.white : Color.primary)
-                    .help(preset.detail)
                 }
             }
 
@@ -848,15 +830,9 @@ struct PresetChipRow: View {
                 } label: {
                     Text(label(value))
                         .font(.system(size: 11, weight: .medium))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 3)
                 }
-                .buttonStyle(.plain)
-                .background(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(isSelected ? Color.accentColor.opacity(0.85) : Color.secondary.opacity(0.12))
-                )
-                .foregroundStyle(isSelected ? Color.white : Color.primary)
+                // 同样整格可点
+                .buttonStyle(ChipButtonStyle(isSelected: isSelected, verticalPadding: 3, cornerRadius: 6))
             }
         }
     }
