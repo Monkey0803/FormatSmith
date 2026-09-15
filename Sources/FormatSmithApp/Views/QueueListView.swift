@@ -31,6 +31,7 @@ struct QueueListView: View {
         .onDrop(of: [UTType.fileURL], isTargeted: nil) { providers in
             DropHandler.handle(providers) { urls in model.add(urls: urls) }
         }
+        .localizedText(model.language)
     }
 
     private var header: some View {
@@ -132,6 +133,7 @@ struct EmptyDropZone: View {
         .onDrop(of: [UTType.fileURL], isTargeted: $isTargeted) { providers in
             DropHandler.handle(providers) { urls in model.add(urls: urls) }
         }
+        .localizedText(model.language)
     }
 }
 
@@ -177,6 +179,7 @@ struct QueueRowView: View {
             RoundedRectangle(cornerRadius: 9, style: .continuous)
                 .strokeBorder(Color.secondary.opacity(0.14), lineWidth: 1)
         )
+        .localizedText(model.language)
     }
 
     private var thumbnail: some View {

@@ -77,6 +77,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The language switch did nothing.** `CommandLineTool.runIfNeeded()` forced English *before*
+  checking whether the process was actually a command-line invocation, and the app calls it on every
+  launch — so the graphical app pinned every string to the English source text. The check now happens
+  first, and the debug log prints a resolved sample string so a mistake like this can be seen.
+- **Switching language jumped the settings panel back to the top.** The switch used to rebuild the
+  whole view tree via `.id(...)`, which also discarded scroll position and input focus. Views that
+  display text now declare that dependency explicitly, so only what changed is re-evaluated.
+- The status line stayed in the previous language after switching. It now stores the message key and
+  typed arguments and re-resolves them, so it follows the selected language too.
+
 - Long HTML and Markdown documents no longer collapse into a single page thousands of points tall.
   `WKWebView.pdf(configuration:)` does not paginate, so the converter measures block positions and
   slices the content into A4 pages itself.

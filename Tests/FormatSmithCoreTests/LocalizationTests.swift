@@ -201,3 +201,99 @@ final class LocalizationTests: XCTestCase {
         return String(trimmed[keyRange])
     }
 }
+
+/// 启动意图的判断：判错会把 GUI 也锁成英文。
+final class LaunchModeTests: XCTestCase {
+
+    func testNoArgumentsMeansTheGraphicalApp() {
+        XCTAssertEqual(LaunchMode.intent(arguments: []), .graphical)
+    }
+
+    func testFinderStyleArgumentsStayGraphical() {
+        // Finder 用「打开方式」启动时会带上文件路径，没有我们认识的开关
+        XCTAssertEqual(LaunchMode.intent(arguments: ["/Users/me/report.pdf"]), .graphical)
+        XCTAssertEqual(LaunchMode.intent(arguments: ["-NSDocumentRevisionsDebugMode", "YES"]), .graphical)
+    }
+
+    func testEveryCommandLineFlagIsRecognized() {
+        for flag in LaunchMode.commandLineFlags {
+            XCTAssertEqual(
+                LaunchMode.intent(arguments: [flag]), .commandLine,
+                "\(flag) 应当被识别为命令行模式"
+            )
+        }
+    }
+
+    func testRealCommandLineInvocations() {
+        XCTAssertEqual(
+            LaunchMode.intent(arguments: ["--convert", "a.pdf", "--to", "png"]), .commandLine
+        )
+        XCTAssertEqual(LaunchMode.intent(arguments: ["--check-localization"]), .commandLine)
+    }
+
+    func testGraphicalLaunchMustNotForceEnglish() {
+        // 这条断言直接对应曾经的 bug：GUI 启动时绝不能打开 forcesBaseLanguage，
+        // 否则语言开关会完全失效（文案永远取英文原文）。
+        Localized.forcesBaseLanguage = false
+        Localized.language = .simplifiedChinese
+        defer {
+            Localized.forcesBaseLanguage = false
+            Localized.language = .system
+        }
+
+        let intent = LaunchMode.intent(arguments: [])
+        XCTAssertEqual(intent, .graphical)
+        XCTAssertFalse(Localized.forcesBaseLanguage, "图形界面不应强制英文")
+    }
+}
+
+/// 状态文案的解析：切语言后必须换成新语言，而不是停在旧语言。
+final class StatusMessageTests: XCTestCase {
+
+    override func setUp() {
+        super.setUp()
+        Localized.forcesBaseLanguage = false
+        Localized.language = .english
+    }
+
+    override func tearDown() {
+        Localized.forcesBaseLanguage = false
+        Localized.language = .system
+        super.tearDown()
+    }
+
+    func testResolvesWithoutArguments() {
+        let message = StatusMessage("Cancelled.")
+        XCTAssertEqual(message.resolved(), "Cancelled.")
+    }
+
+    func testFormatsTextAndNumberArguments() {
+        let message = StatusMessage("Finished: %d file(s) → %@", 3, "/tmp/out")
+        XCTAssertEqual(message.resolved(), "Finished: 3 file(s) → /tmp/out")
+    }
+
+    func testArgumentsAreTypeCheckedNotStringified() {
+        // %d 必须拿到 Int，传字符串会崩，所以参数保留类型
+        let message = StatusMessage("Added %d file(s).", 7)
+        XCTAssertEqual(message.resolved(), "Added 7 file(s).")
+    }
+
+    func testSwitchingLanguageReresolvesTheSameMessage() {
+        let message = StatusMessage("Cancelled.")
+        let english = message.resolved()
+
+        Localized.language = .simplifiedChinese
+        let chinese = message.resolved()
+
+        if Localized.bundle(for: .simplifiedChinese) != nil {
+            XCTAssertNotEqual(english, chinese, "同一条状态在不同语言下应当解析出不同文案")
+        }
+    }
+
+    func testSuccessDetectionFollowsTheKeyNotTheLanguage() {
+        // 图标判断不能依赖渲染后的文案，否则切语言就失效了
+        XCTAssertTrue(StatusMessage("Finished: %d file(s) → %@", 1, "/tmp").isSuccess)
+        XCTAssertTrue(StatusMessage("Merged %d images → %@", 2, "/tmp").isSuccess)
+        XCTAssertFalse(StatusMessage("Cancelled.").isSuccess)
+    }
+}

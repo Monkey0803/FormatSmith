@@ -40,6 +40,7 @@ struct ConversionSettingsPanel: View {
         .background(Color(nsColor: .controlBackgroundColor).opacity(0.35))
         // 转换进行中锁定设置：本次转换使用开始时的快照，避免改动造成误解。
         .disabled(model.isConverting)
+        .localizedText(model.language)
     }
 
     /// 当前可选格式；若已选格式不在当前列表里（例如上次选了长尾格式），补进去避免选择器空白。

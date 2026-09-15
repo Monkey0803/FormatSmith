@@ -80,11 +80,29 @@ Test fixtures are generated at runtime by `FixtureFactory`. Please do not commit
 English is the source language, and **the English string is the key**:
 
 ```swift
-Text(Localized.text("Drop PDF files here"))
+Text(Localized.text("Drop files here"))
 ```
 
 Add the Simplified Chinese translation to `Resources/i18n/zh-Hans.lproj/Localizable.strings`. Keep
 format specifiers (`%@`, `%d`, `%.0f`) in the same order and count as the English string.
+`swift test` fails if a key used in the code has no translation.
+
+### If you add a new view that shows text
+
+`Localized.text(...)` is a plain function, so SwiftUI has no way of knowing a view used it, and the
+view will not re-render when the user switches language. Any view whose body contains localized text
+must declare that dependency:
+
+```swift
+var body: some View {
+    VStack { Text(Localized.text("Files")) }
+        .localizedText(model.language)   // 读取当前语言 → 切换时重新取词
+}
+```
+
+Views that only pass already-resolved strings to a child do not need it. For text that is *stored*
+rather than recomputed each render (like the status line), store a `StatusMessage` (key + typed
+arguments) and call `resolved()` in the view.
 
 ## Commits and pull requests
 

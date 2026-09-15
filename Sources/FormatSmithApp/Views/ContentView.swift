@@ -25,6 +25,7 @@ struct ContentView: View {
                 model.add(urls: urls)
             }
         }
+        .localizedText(model.language)
     }
 }
 
@@ -44,7 +45,7 @@ struct BottomBarView: View {
                 Image(systemName: statusIcon)
                     .foregroundStyle(statusColor)
                     .font(.system(size: 13))
-                Text(model.statusText)
+                Text(model.status.resolved())
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -75,17 +76,18 @@ struct BottomBarView: View {
             .padding(.vertical, 10)
         }
         .background(.bar)
+        .localizedText(model.language)
     }
 
     private var statusIcon: String {
         if model.isConverting { return "arrow.triangle.2.circlepath" }
-        if model.statusText.hasPrefix(Localized.text("Finished")) { return "checkmark.circle.fill" }
+        if model.status.isSuccess { return "checkmark.circle.fill" }
         return "info.circle"
     }
 
     private var statusColor: Color {
         if model.isConverting { return .accentColor }
-        if model.statusText.hasPrefix(Localized.text("Finished")) { return .green }
+        if model.status.isSuccess { return .green }
         return .secondary
     }
 }

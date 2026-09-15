@@ -20,9 +20,8 @@ struct FormatSmithApp: App {
                 .environmentObject(model)
                 .frame(minWidth: 940, minHeight: 600)
                 .onAppear { appDelegate.model = model }
-                // 切换语言时换掉 id，强制重建整棵视图树，
-                // 这样所有 Localized.text(...) 都会重新求值，不需要重启应用。
-                .id("root-\(model.language.rawValue)")
+                // 语言变化时让视图重新取词（不重建视图树，滚动位置与输入焦点都会保留）。
+                .localizedText(model.language)
         }
         .defaultSize(width: 1040, height: 680)
         .windowResizability(.contentMinSize)
@@ -37,7 +36,7 @@ struct FormatSmithApp: App {
                     .disabled(model.items.isEmpty || model.isConverting)
             }
             CommandMenu(Localized.text("Language")) {
-                // 读一次 language，让菜单在切换语言后也跟着重建
+                // 读一次 language：切换后菜单标题也跟着更新
                 let active = model.language
                 ForEach(AppLanguage.allCases) { candidate in
                     Button {

@@ -44,7 +44,7 @@ final class ConverterModel: ObservableObject {
     }
     @Published var isConverting = false
     @Published var overallProgress: Double = 0
-    @Published var statusText = Localized.text("Drop files here, or click “Choose Files” to start.")
+    @Published var status: StatusMessage = .idle
     @Published var lastOutputFolder: URL?
     /// 是否展开长尾格式。
     @Published var showsAllFormats = false
@@ -69,8 +69,12 @@ final class ConverterModel: ObservableObject {
         let resolved = stored.flatMap(AppLanguage.init(rawValue:)) ?? .system
         language = resolved
         Localized.language = resolved
+        // 打一行真实解析出来的文案：「偏好是什么」和「界面实际会显示什么」是两件事，
+        // 只打偏好会漏掉「语言被别处强制成英文」这种 bug。
         DebugLog.log(
-            "language: \(resolved.rawValue) (bundled: \(Localized.bundledLanguages().joined(separator: ", ")))"
+            "language: \(resolved.rawValue) "
+                + "(bundled: \(Localized.bundledLanguages().joined(separator: ", "))) "
+                + "sample: \(Localized.text("Output format"))"
         )
 
         if let data = UserDefaults.standard.data(forKey: defaultsKey),
@@ -200,7 +204,7 @@ final class ConverterModel: ObservableObject {
         var updated = settings
         preset.apply(to: &updated)
         settings = updated
-        statusText = Localized.text("Applied preset: %@", preset.name)
+        status = StatusMessage("Applied preset: %@", preset.name)
     }
 
     /// 当前设置是否正好等于某个预设。
@@ -227,7 +231,7 @@ final class ConverterModel: ObservableObject {
         DebugLog.log("add(urls: \(urls.count)) → \(added.count) new item(s)")
         guard !added.isEmpty else { return }
         items.append(contentsOf: added)
-        statusText = Localized.text("Added %d file(s).", added.count)
+        status = StatusMessage("Added %d file(s).", added.count)
         loadMetadata(for: added.map(\.id))
     }
 
@@ -252,7 +256,7 @@ final class ConverterModel: ObservableObject {
             } else if isSupported(url) {
                 result.append(url)
             } else {
-                statusText = Localized.text("Ignored unsupported file: %@", url.lastPathComponent)
+                status = StatusMessage("Ignored unsupported file: %@", url.lastPathComponent)
             }
         }
 
@@ -311,7 +315,7 @@ final class ConverterModel: ObservableObject {
     func remove(id: UUID) {
         items.removeAll { $0.id == id }
         if items.isEmpty {
-            statusText = Localized.text("Drop files here, or click “Choose Files” to start.")
+            status = .idle
         }
     }
 
@@ -319,7 +323,7 @@ final class ConverterModel: ObservableObject {
         guard !isConverting else { return }
         items.removeAll()
         overallProgress = 0
-        statusText = Localized.text("Drop files here, or click “Choose Files” to start.")
+        status = .idle
     }
 
     func clearFinished() {
@@ -361,7 +365,7 @@ final class ConverterModel: ObservableObject {
         let folder = lastOutputFolder ?? settings.resolvedOutputDirectory
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: folder.path, isDirectory: &isDirectory) else {
-            statusText = Localized.text("Output folder does not exist: %@", folder.path)
+            status = StatusMessage("Output folder does not exist: %@", folder.path)
             return
         }
         NSWorkspace.shared.open(folder)
@@ -378,13 +382,13 @@ final class ConverterModel: ObservableObject {
 
         let queue = convertibleItems
         guard !queue.isEmpty else {
-            statusText = Localized.text("There is nothing to convert.")
+            status = StatusMessage("There is nothing to convert.")
             return
         }
 
         let reasons = unavailableReasons
         guard reasons.isEmpty else {
-            statusText = reasons[0]
+            status = StatusMessage("%@", reasons[0])
             return
         }
 
@@ -392,7 +396,7 @@ final class ConverterModel: ObservableObject {
         do {
             try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         } catch {
-            statusText = Localized.text("Output folder is not writable: %@", error.localizedDescription)
+            status = StatusMessage("Output folder is not writable: %@", error.localizedDescription)
             return
         }
 
@@ -440,10 +444,10 @@ final class ConverterModel: ObservableObject {
         let limit = ConversionEngine.automaticConcurrency(configured: snapshot.maxConcurrentFiles)
         inFlightProgress.removeAll()
 
-        statusText =
+        status =
             limit > 1
-            ? Localized.text("Converting %d file(s), %d at a time…", jobs.count, limit)
-            : Localized.text("Converting %d file(s)…", jobs.count)
+            ? StatusMessage("Converting %d file(s), %d at a time…", jobs.count, limit)
+            : StatusMessage("Converting %d file(s)…", jobs.count)
 
         for (documentID, document) in jobs {
             markConverting(itemID: documentID, done: 0, total: max(document.pageCount, 1))
@@ -534,7 +538,7 @@ final class ConverterModel: ObservableObject {
         for (documentID, _) in jobs {
             markConverting(itemID: documentID, done: 0, total: 1)
         }
-        statusText = Localized.text("Merging %d images into one PDF…", jobs.count)
+        status = StatusMessage("Merging %d images into one PDF…", jobs.count)
 
         let documents = jobs.map(\.1)
         let observer = ConversionObserver(onProgress: { progress in
@@ -577,7 +581,7 @@ final class ConverterModel: ObservableObject {
         for (documentID, _) in jobs {
             markConverting(itemID: documentID, done: 0, total: 1)
         }
-        statusText = Localized.text("Merging %d PDFs into one…", jobs.count)
+        status = StatusMessage("Merging %d PDFs into one…", jobs.count)
 
         let documents = jobs.map(\.1)
         let observer = ConversionObserver(onProgress: { progress in
@@ -644,23 +648,23 @@ final class ConverterModel: ObservableObject {
         lastOutputFolder = lastFolder
 
         if cancelled {
-            statusText = Localized.text("Cancelled.")
+            status = StatusMessage("Cancelled.")
         } else if failures > 0 {
-            statusText = Localized.text("Finished with %d failure(s).", failures)
+            status = StatusMessage("Finished with %d failure(s).", failures)
         } else if let successSummary {
-            statusText = successSummary
+            status = StatusMessage("%@", successSummary)
             if snapshot.openFolderWhenFinished { openOutputFolder() }
         } else if mergedCount > 0 {
-            statusText = Localized.text("Merged %d images → %@", mergedCount, lastFolder.path)
+            status = StatusMessage("Merged %d images → %@", mergedCount, lastFolder.path)
             if snapshot.openFolderWhenFinished { openOutputFolder() }
         } else {
-            statusText = Localized.text("Finished: %d file(s) → %@", finished, root.path)
+            status = StatusMessage("Finished: %d file(s) → %@", finished, root.path)
             if snapshot.openFolderWhenFinished { openOutputFolder() }
         }
     }
 
     func cancelConversion() {
         cancellation.cancel()
-        statusText = Localized.text("Cancelling…")
+        status = StatusMessage("Cancelling…")
     }
 }

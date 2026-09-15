@@ -12,17 +12,13 @@ enum CommandLineTool {
 
     static func runIfNeeded() {
         let arguments = Array(CommandLine.arguments.dropFirst())
+
+        // 必须先确认这次确实是命令行调用，再强制英文。
+        // 顺序反了的话，图形界面也会被锁成英文 —— 语言开关就彻底失效了。
+        guard LaunchMode.intent(arguments: arguments) == .commandLine else { return }
+
         // 命令行输出保持英文原文，避免脚本行为随系统语言变化。
         Localized.forcesBaseLanguage = true
-        let wantsCLI =
-            arguments.contains("--convert")
-            || arguments.contains("--help") || arguments.contains("-h")
-            || arguments.contains("--list-formats")
-            || arguments.contains("--check-dependencies")
-            || arguments.contains("--check-localization")
-            || arguments.contains("--version")
-        guard wantsCLI else { return }
-
         exit(run(arguments: arguments))
     }
 
