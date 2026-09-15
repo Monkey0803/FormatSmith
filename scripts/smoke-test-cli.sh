@@ -192,6 +192,39 @@ OUT="$TOOLS/compress"
 expect_exit 0 $? "compress"
 expect_file "$OUT/small.pdf" "compressed PDF written"
 
+echo "▶ Documents → PDF…"
+DOCS="$WORK/docs"
+mkdir -p "$DOCS"
+printf '# Notes\n\nA **bold** line and a list:\n\n- one\n- two\n' > "$DOCS/notes.md"
+printf '<html><body><h1>Page</h1><p>Rendered by WebKit.</p></body></html>' > "$DOCS/page.html"
+printf 'plain text\nsecond line\n' > "$DOCS/plain.txt"
+
+OUT="$DOCS/out"
+"$BIN" --convert "$DOCS/notes.md" --to pdf --out "$OUT" >/dev/null 2>&1
+expect_exit 0 $? "Markdown to PDF"
+expect_file "$OUT/notes.pdf" "Markdown PDF written"
+
+"$BIN" --convert "$DOCS/page.html" --to pdf --out "$OUT" >/dev/null 2>&1
+expect_exit 0 $? "HTML to PDF"
+expect_file "$OUT/page.pdf" "HTML PDF written"
+# sips 会把 841.89 截断成 841，所以按区间判断而不是精确值
+PAGE_W="$(sips -g pixelWidth "$OUT/page.pdf" 2>/dev/null | awk '/pixelWidth/{print $2}' | cut -d. -f1)"
+PAGE_H="$(sips -g pixelHeight "$OUT/page.pdf" 2>/dev/null | awk '/pixelHeight/{print $2}' | cut -d. -f1)"
+if [ "$PAGE_W" = "595" ] && [ "$PAGE_H" -ge 840 ] && [ "$PAGE_H" -le 843 ]; then
+    pass "HTML PDF is A4 (${PAGE_W}×${PAGE_H})"
+else
+    fail "HTML PDF is not A4: ${PAGE_W}×${PAGE_H}"
+fi
+
+"$BIN" --convert "$DOCS/plain.txt" --to pdf --out "$OUT" >/dev/null 2>&1
+expect_exit 0 $? "plain text to PDF"
+expect_file "$OUT/plain.pdf" "plain text PDF written"
+
+echo "▶ Dependency reporting…"
+"$BIN" --check-dependencies > "$WORK/deps.txt" 2>&1
+expect_exit 0 $? "--check-dependencies"
+if grep -q "LibreOffice" "$WORK/deps.txt"; then pass "reports LibreOffice status"; else fail "no LibreOffice line in --check-dependencies"; fi
+
 echo "▶ Error handling…"
 "$BIN" --convert "$WORK/does-not-exist.pdf" --format png --out "$WORK/none" >/dev/null 2>&1
 expect_exit 1 $? "missing input file"
@@ -210,13 +243,22 @@ else
     fail "WebP rejection message is unhelpful: $WEBP_MSG"
 fi
 
-# 文档输入仍未实现，必须明确说明而不是静默失败
-printf 'hello' > "$WORK/notes.md"
-DOC_MSG="$("$BIN" --convert "$WORK/notes.md" --to pdf --out "$WORK/none" 2>&1)"
-if printf '%s' "$DOC_MSG" | grep -qi "not supported yet"; then
-    pass "unsupported input reports clearly"
+# 文档不能直接转成图片，必须说清楚要先经过 PDF
+printf 'hello' > "$WORK/note.md"
+DOC_MSG="$("$BIN" --convert "$WORK/note.md" --to png --out "$WORK/none" 2>&1)"
+if printf '%s' "$DOC_MSG" | grep -qi "pdf first"; then
+    pass "document to image explains the PDF step"
 else
-    fail "document input message is unclear: $DOC_MSG"
+    fail "document to image message is unclear: $DOC_MSG"
+fi
+
+# 完全不认识的输入要明确拒绝
+printf 'binary' > "$WORK/mystery.xyz"
+UNKNOWN_MSG="$("$BIN" --convert "$WORK/mystery.xyz" --to pdf --out "$WORK/none" 2>&1)"
+if printf '%s' "$UNKNOWN_MSG" | grep -qi "unsupported input type"; then
+    pass "unknown input reports clearly"
+else
+    fail "unknown input message is unclear: $UNKNOWN_MSG"
 fi
 
 # PDF → PDF 现在默认是「合并」，单个输入等同于复制一份

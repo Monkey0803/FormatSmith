@@ -69,6 +69,9 @@ public enum InputKind: Equatable, Sendable {
 
     // MARK: - 属性
 
+    /// 是否是「按页组织」的输入（PDF），只有它才有页数的概念。
+    public var isPDFLike: Bool { self == .pdf }
+
     /// 是否属于「文件本身就是位图/矢量图」的一类（含 PDF 之外的图片）。
     public var isImage: Bool {
         if case .image = self { return true }

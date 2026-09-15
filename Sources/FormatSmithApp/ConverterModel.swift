@@ -114,6 +114,27 @@ final class ConverterModel: ObservableObject {
         return ConversionRouter.batchAvailability(inputs: kinds, target: target).unsupportedReasons
     }
 
+    /// 当前队列需要、但本机没装的外部工具。
+    ///
+    /// 只查文件系统（不启动进程），可以安全地在界面里算。
+    var missingRequiredTools: [ExternalTool] {
+        var missing: [ExternalTool] = []
+        let needsOffice = queueKinds.contains { kind in
+            if case .office = kind { return true }
+            return false
+        }
+        if needsOffice {
+            let libreOffice = ToolLocator.libreOffice()
+            if !libreOffice.isAvailable { missing.append(libreOffice) }
+        }
+        return missing
+    }
+
+    /// 本机已探测到的可选工具（用于「依赖」一栏的说明）。
+    var detectedTools: [ExternalTool] {
+        ToolLocator.all().filter(\.isAvailable)
+    }
+
     /// 这批文件会走哪条管线。
     var plannedKind: ConversionPlan.Kind? {
         let kinds = queueKinds
@@ -128,10 +149,23 @@ final class ConverterModel: ObservableObject {
     /// 底部主按钮的标题：直接说清楚这次会做什么。
     var actionTitle: String {
         if model_isPDFTarget {
+            if hasDocumentInputs, !hasPDFInputs, !hasImageInputs {
+                return Localized.text("Create PDF")
+            }
             if hasPDFInputs { return settings.pdfTool.displayName }
             return Localized.text("Create PDF")
         }
         return Localized.text("Convert Now")
+    }
+
+    /// 队列里是否有文档类输入（Office / HTML / Markdown / 纯文本）。
+    var hasDocumentInputs: Bool {
+        queueKinds.contains { kind in
+            switch kind {
+            case .office, .html, .markdown, .plainText: return true
+            default: return false
+            }
+        }
     }
 
     private var model_isPDFTarget: Bool { target.isPDF }
@@ -191,11 +225,11 @@ final class ConverterModel: ObservableObject {
         }
     }
 
-    /// 当前支持的输入：PDF 与图片。文档类输入在后续版本接入。
+    /// 当前支持的输入：PDF、图片，以及能转成 PDF 的文档。
     private func isSupported(_ url: URL) -> Bool {
         switch InputKind.detect(url: url) {
-        case .pdf, .image: return true
-        default: return false
+        case .pdf, .image, .office, .html, .markdown, .plainText: return true
+        case .unknown: return false
         }
     }
 
@@ -213,7 +247,7 @@ final class ConverterModel: ObservableObject {
                         switch kind {
                         case .pdf: return PDFRasterizer.thumbnail(for: url, maxSize: 128)
                         case .image: return ImageDecoder.thumbnail(url: url, maxSize: 128)
-                        default: return nil
+                        default: return nil  // 文档类没有便宜的缩略图路径
                         }
                     }()
                     return (
@@ -264,7 +298,7 @@ final class ConverterModel: ObservableObject {
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
         panel.canChooseFiles = true
-        panel.allowedContentTypes = [.pdf, .image]
+        panel.allowedContentTypes = [.pdf, .image, .html, .plainText, .rtf]
         if panel.runModal() == .OK {
             add(urls: panel.urls)
         }

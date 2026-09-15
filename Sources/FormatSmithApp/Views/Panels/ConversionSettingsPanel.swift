@@ -10,6 +10,9 @@ struct ConversionSettingsPanel: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 targetSection
+                if !model.missingRequiredTools.isEmpty {
+                    dependencySection
+                }
                 if model.target.isPDF {
                     if model.hasPDFInputs {
                         pdfToolSection
@@ -92,6 +95,47 @@ struct ConversionSettingsPanel: View {
                     .foregroundStyle(.orange)
                     .fixedSize(horizontal: false, vertical: true)
             }
+        }
+    }
+
+    /// 缺少外部工具时给出的说明与安装入口。
+    private var dependencySection: some View {
+        SettingsCard(title: Localized.text("Missing tools"), systemImage: "wrench.adjustable") {
+            ForEach(model.missingRequiredTools, id: \.name) { tool in
+                VStack(alignment: .leading, spacing: 6) {
+                    Label(tool.name, systemImage: "exclamationmark.triangle.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.orange)
+
+                    Text(tool.installHint)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    if let command = tool.installCommand {
+                        HStack(spacing: 6) {
+                            Text(command)
+                                .font(.system(size: 11, design: .monospaced))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 3)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                        .fill(Color.secondary.opacity(0.12))
+                                )
+                                .textSelection(.enabled)
+                            Button(Localized.text("Copy")) {
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(command, forType: .string)
+                            }
+                            .controlSize(.small)
+                        }
+                    }
+                }
+            }
+
+            Text(Localized.text("Everything else works without it."))
+                .font(.system(size: 10))
+                .foregroundStyle(.tertiary)
         }
     }
 

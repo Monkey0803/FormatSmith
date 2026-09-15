@@ -4,9 +4,8 @@
 locally through Apple's own frameworks — nothing is uploaded, and there is no third-party dependency
 in the app itself.
 
-> Status: **PDF → image**, **image → image**, **image → PDF** and the **PDF toolbox** work today, in
-> both the app and the CLI. Document conversion is being built in the open; see the
-> [roadmap](#roadmap).
+> Status: PDF → image, image → image, image → PDF, the PDF toolbox and **document → PDF** all work
+> today, in both the app and the CLI. See the [roadmap](#roadmap) for what is still coming.
 
 ## Features
 
@@ -28,6 +27,9 @@ in the app itself.
 - **PDF toolbox**: merge several PDFs, split one every N pages, extract just the pages you list,
   rotate every page by 90/180/270°, or compress by re-rasterising at a lower DPI. Compressing is
   lossy by design and the app says so before you run it.
+- **Documents → PDF**: Office, OpenDocument and RTF through a LibreOffice you already have; HTML,
+  Markdown and plain text through the system WebKit, with no extra installation. Markdown uses pandoc
+  when it is around and falls back to a built-in renderer when it is not.
 - **A real CLI** in the same binary, for scripts and batch jobs. Its output stays in English
   regardless of system language, so scripts can rely on it.
 
@@ -102,6 +104,7 @@ dist/FormatSmith.app/Contents/MacOS/FormatSmith --list-formats
 | `--pdf-tool <tool>` | `merge`, `split`, `extract`, `rotate`, or `compress` (PDF in, PDF out) |
 | `--split-every <n>` | Pages per file when splitting |
 | `--rotate <deg>` | `90`, `180`, or `270` |
+| `--check-dependencies` | Report whether LibreOffice and pandoc were found |
 | `--list-formats` | List output formats available on this Mac |
 | `--version`, `--help` | Version / usage |
 
@@ -116,7 +119,7 @@ Set `FORMATSMITH_DEBUG=1` for a trace of file intake and metadata reads.
 - [x] Image → image, including WebP, JPEG XL, HEIC and RAW input
 - [x] Image → PDF (combine several images into one document)
 - [x] PDF toolbox: merge, split, extract pages, rotate, compress
-- [ ] Documents → PDF (Office via LibreOffice, HTML natively, Markdown via pandoc)
+- [x] Documents → PDF (Office via LibreOffice, HTML natively, Markdown via pandoc)
 Video and audio conversion is explicitly **not** in scope — that is a different stack, and it would
 make this a different app.
 
@@ -165,7 +168,9 @@ everywhere or reported as unavailable everywhere:
 | PDF | PDF | `PDFToolkit`: merge, split, extract, rotate, compress |
 | image | image | Decode, scale, re-encode |
 | image | PDF | `PDFComposer`, optionally merging several files |
-| Office / HTML / Markdown | PDF | Planned; documents → images is rejected with an explanation |
+| Office / OpenDocument / RTF | PDF | LibreOffice, run headless with a private profile |
+| HTML / Markdown / plain text | PDF | WebKit, rendered to A4 and paginated; pandoc first for Markdown |
+| Office / HTML / Markdown | image | Rejected with an explanation — go through PDF first |
 
 ## Contributing
 
@@ -173,8 +178,23 @@ Issues and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 `swift test` must pass, and `swift format lint --configuration .swift-format --recursive Sources Tests`
 must be clean.
 
+## Optional external tools
+
+Two features can use tools you may already have. Nothing is bundled, and nothing is required:
+
+| Tool | Used for | Without it |
+| --- | --- | --- |
+| [LibreOffice](https://www.libreoffice.org) | Word, Excel, PowerPoint, OpenDocument, RTF | Those inputs report that LibreOffice is needed, and how to install it |
+| [pandoc](https://pandoc.org) | Higher-fidelity Markdown | Markdown still converts, using the built-in renderer |
+
+`--check-dependencies` reports what was found, and the app shows a **Missing tools** card with a
+copyable `brew install` command when a queued file needs something you do not have.
+
 ## Known limitations
 
+- **HTML/Markdown pagination slices at block boundaries.** Long documents become proper A4 pages, and
+  the renderer avoids splitting paragraphs where it can, but a single element taller than a page
+  (a huge code block, a very long table) will still be cut.
 - **Compress is lossy.** It re-rasterises each page, so text stops being selectable and vector art is
   flattened. The app labels it as lossy; there is no "lossless shrink" mode.
 - **WebP and JPEG XL can be read but not written**, because macOS itself does not write them. Rather

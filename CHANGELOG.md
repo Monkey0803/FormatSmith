@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Document → PDF: Office, OpenDocument and RTF via a locally installed LibreOffice (run headless with
+  a private profile so it never collides with the copy you have open); HTML, Markdown and plain text
+  via WebKit with no extra dependency. Markdown prefers pandoc and falls back to a built-in renderer.
+- `ToolLocator` and `--check-dependencies`: detects LibreOffice and pandoc from an environment
+  override, well-known install locations, or `PATH`, and the app shows a Missing tools card with a
+  copyable install command when a queued file needs one.
+- An external process runner with a hard timeout, and a main-thread bridge so WebKit work is safe to
+  call from a background conversion *and* from the command line.
+
 - PDF toolbox: merge several PDFs, split every N pages, extract a page selection, rotate by
   90/180/270°, and compress by re-rasterising at a lower DPI. Available from the app's PDF tool
   picker and from the CLI (`--pdf-tool`, `--split-every`, `--rotate`).
@@ -51,6 +60,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for single-image output produced `photo-.png`).
 - ICO output that is not a 16–256 px square now reports what is wrong instead of a generic
   "finalize failed" error.
+
+### Fixed
+
+- Long HTML and Markdown documents no longer collapse into a single page thousands of points tall.
+  `WKWebView.pdf(configuration:)` does not paginate, so the converter measures block positions and
+  slices the content into A4 pages itself.
 
 ### Removed
 

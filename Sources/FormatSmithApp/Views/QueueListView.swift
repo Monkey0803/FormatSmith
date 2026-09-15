@@ -213,6 +213,9 @@ struct QueueRowView: View {
                     Int(size.height)
                 )
             }
+            if item.document.kind.isImage || !item.document.kind.isPDFLike {
+                return Localized.text("%@ · ready", item.document.kind.displayName)
+            }
             return Localized.text("%d page(s) · ready", item.document.pageCount)
         case let .converting(done, total):
             return Localized.text("Converting %d of %d", done, total)

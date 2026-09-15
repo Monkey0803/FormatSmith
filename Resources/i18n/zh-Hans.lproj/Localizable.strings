@@ -2,10 +2,13 @@
    英文原文即 key；新增文案时请同时更新英文源码与这里。 */
 
 "%@ cannot store transparency, so a solid background is used." = "%@ 无法保存透明通道，将使用纯色背景。";
+"%@ did not produce a PDF for “%@”." = "%@ 没有为「%@」生成 PDF。";
 "%@ is lossless, so the quality setting does not apply." = "%@ 是无损格式，画质设置不生效。";
+"%@ is required for this file type. %@" = "该文件类型需要 %@。%@";
 "%@ needs %@, but the output would be %d×%d. Change the page size, scale, or pick another format." = "%@ 需要%@，但当前输出为 %d×%d。请调整页面尺寸、缩放比例，或换一种格式。";
 "%@ was not found, so this format cannot be converted. %@" = "未找到 %@，无法转换该格式。%@";
 "%@ · %d × %d px" = "%@ · %d × %d 像素";
+"%@ · ready" = "%@ · 就绪";
 "%d image(s) · %@" = "%d 张图片 · %@";
 "%d of %d page(s)" = "共 %d 页中的 %d 页";
 "%d page(s)" = "%d 页";
@@ -47,10 +50,14 @@
 "Converting %@ to %@ is not supported." = "不支持把 %@ 转换为 %@。";
 "Converting %d of %d" = "转换中 %d/%d";
 "Converting: %@" = "正在转换：%@";
+"Copy" = "复制";
 "Could not create a drawing context." = "无法创建绘图上下文。";
 "Could not create the PDF context." = "无法创建 PDF 上下文。";
 "Could not decode this image." = "无法解码该图片。";
 "Could not read this file." = "无法读取该文件。";
+"Could not render the page." = "无法渲染页面。";
+"Could not render the page: %@" = "无法渲染页面：%@";
+"Could not start the converter: %@" = "无法启动转换器：%@";
 "Could not write the PDF." = "无法写出 PDF。";
 "Create PDF" = "生成 PDF";
 "Custom" = "自定义";
@@ -60,6 +67,7 @@
 "Drop files here, or click “Choose Files” to start." = "拖入文件，或点「选择文件」开始。";
 "Each image" = "单张尺寸";
 "Each page matches its image: 1 pixel = 1 point." = "页面与图片尺寸一致：1 像素 = 1 点。";
+"Everything else works without it." = "其余功能不受影响。";
 "Example name" = "示例文件名";
 "Extract pages" = "提取页面";
 "Failed to encode %@." = "%@ 编码失败。";
@@ -75,6 +83,8 @@
 "Images" = "图片";
 "Images are embedded losslessly, so the PDF can be large." = "图片以无损方式嵌入，PDF 可能较大。";
 "Images are scaled to fit and centered on the page." = "图片等比缩放后居中放置。";
+"Install it with Homebrew, or download it from libreoffice.org." = "可以用 Homebrew 安装，也可以从 libreoffice.org 下载。";
+"Install it with Homebrew. Markdown still converts without it, using the built-in renderer." = "可以用 Homebrew 安装；没装时 Markdown 仍会用内置渲染器转换。";
 "Join several PDFs into one document." = "把多个 PDF 首尾相接合成一个文档。";
 "Keep only the pages you list." = "只保留你列出的页面。";
 "Lossless" = "无损";
@@ -87,9 +97,11 @@
 "Merged %d images → %@" = "已合并 %d 张图片 → %@";
 "Merging %d PDFs into one…" = "正在把 %d 个 PDF 合并成一个…";
 "Merging %d images into one PDF…" = "正在把 %d 张图片合并成一个 PDF…";
+"Missing tools" = "缺少依赖";
 "No page matches this range." = "没有页码落在该范围内。";
 "No transparency" = "不支持透明";
 "Not available in this build yet." = "当前版本尚未提供该功能。";
+"Not found" = "未找到";
 "One PDF per source file." = "每个源文件输出一个 PDF。";
 "One image per page, numbered from 1." = "每页输出一张图片，页码从 1 开始。";
 "Open" = "打开";
@@ -126,6 +138,9 @@
 "Supports transparency" = "支持透明";
 "Text" = "文本";
 "The computed output size is invalid. Lower the resolution." = "计算出的尺寸无效，请降低分辨率。";
+"The converter did not finish in time." = "转换器没有在限定时间内完成。";
+"The converter did not finish within %d seconds." = "转换器在 %d 秒内没有完成。";
+"The converter failed (exit %d): %@" = "转换器失败（退出码 %d）：%@";
 "The output would be about %.0f megapixels, over the %.0f megapixel safety limit. Lower the DPI or scale." = "输出约为 %.0f 百万像素，超过 %.0f 百万像素的安全上限，请降低 DPI 或倍数。";
 "The page range is empty or invalid." = "页码范围为空或不合法。";
 "There is nothing to convert." = "没有可转换的文件。";

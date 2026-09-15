@@ -211,12 +211,11 @@ enum CommandLineTool {
 
             let document = SourceDocument.make(from: url)
             switch document.kind {
-            case .pdf, .image:
+            case .pdf, .image, .office, .html, .markdown, .plainText:
                 documents.append(document)
-            default:
+            case .unknown:
                 FileHandle.standardError.write(
-                    "Skipping \(url.lastPathComponent): \(document.kind.displayName) input is not supported yet.\n"
-                        .data(using: .utf8)!
+                    "Skipping \(url.lastPathComponent): unsupported input type.\n".data(using: .utf8)!
                 )
                 failures += 1
             }
@@ -358,9 +357,15 @@ enum CommandLineTool {
     }
 
     private static func printDependencies() {
-        // 外部工具探测（LibreOffice / pandoc）在文档转换阶段接入。
-        print("LibreOffice : not checked yet")
-        print("pandoc      : not checked yet")
+        // 这是用户显式要求的动作，所以可以放心地起进程探测版本。
+        print("Optional external tools (only needed for some document inputs):")
+        for tool in ToolLocator.all() {
+            print("  \(tool.name.padding(toLength: 12, withPad: " ", startingAt: 0)) \(tool.describe())")
+            if !tool.isAvailable {
+                print("               hint: \(tool.installHint)")
+            }
+        }
+        print("\nWithout them: HTML, Markdown and plain text still convert (rendered by WebKit).")
     }
 
     private static func printUsage() {
@@ -370,9 +375,12 @@ enum CommandLineTool {
 
               formatsmith --convert <file> [more files…] --to <target> [options]
 
+            Inputs:
+              PDF, images, and documents (Office, HTML, Markdown, plain text → PDF).
+
             Targets:
               --to png | jpeg | heic | avif | tiff | gif | bmp | jp2 | psd | tga | exr | pbm | ico
-              --to pdf              Combine images (or convert single files) into PDF
+              --to pdf              Combine images, run a PDF tool, or convert a document
 
             Options:
               --quality <0.05-1>    Quality for lossy formats (default 0.9)

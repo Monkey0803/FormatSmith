@@ -56,12 +56,30 @@ final class ConversionRouterTests: XCTestCase {
 
     // MARK: - 文档输入
 
-    func testDocumentToPDFIsPlannedButNotImplementedYet() {
+    func testWebBasedDocumentInputsAreAlwaysReady() {
+        // HTML / Markdown / 纯文本走系统 WebKit，不需要任何额外安装
+        for kind in [InputKind.html, .markdown, .plainText] {
+            let plan = ConversionRouter.plan(input: kind, target: .pdf)
+            XCTAssertEqual(plan.kind, .documentToPDF)
+            XCTAssertEqual(plan.availability, .ready, "\(kind.displayName) 应当可以直接转换")
+        }
+    }
+
+    func testOfficeInputDependsOnLibreOffice() {
         let office = InputKind.classify(identifier: nil, fileExtension: "docx")
         let plan = ConversionRouter.plan(input: office, target: .pdf)
         XCTAssertEqual(plan.kind, .documentToPDF)
-        XCTAssertEqual(plan.availability, .notImplementedYet)
-        XCTAssertNotNil(plan.unavailableReason)
+
+        if ToolLocator.libreOffice().isAvailable {
+            XCTAssertEqual(plan.availability, .ready, "装了 LibreOffice 就该能转")
+            XCTAssertNil(plan.unavailableReason)
+        } else {
+            guard case let .unsupported(reason) = plan.availability else {
+                return XCTFail("没装 LibreOffice 时应明确说明，实际 \(plan.availability)")
+            }
+            XCTAssertTrue(reason.contains("LibreOffice"), reason)
+            XCTAssertTrue(reason.lowercased().contains("install"), "应告诉用户怎么装: \(reason)")
+        }
     }
 
     func testDocumentToImageExplainsThePDFStep() {

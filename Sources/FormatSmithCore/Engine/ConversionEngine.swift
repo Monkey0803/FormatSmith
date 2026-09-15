@@ -129,10 +129,71 @@ public enum ConversionEngine {
                 fileCount: fileCount
             )
 
-        case .documentToPDF, .imagesToOnePDF:
+        case .documentToPDF:
+            return convertDocument(
+                document: document,
+                settings: settings,
+                cancellation: cancellation,
+                observer: observer,
+                fileIndex: fileIndex,
+                fileCount: fileCount
+            )
+
+        case .imagesToOnePDF:
             return ConversionResult(
                 documentID: document.id,
                 error: ConversionError(plan.unavailableReason ?? Localized.text("Not available in this build yet."))
+            )
+        }
+    }
+
+    // MARK: - 文档 → PDF
+
+    /// Office / HTML / Markdown / 纯文本 → PDF。
+    public static func convertDocument(
+        document: SourceDocument,
+        settings: ConversionSettings,
+        cancellation: CancellationFlag,
+        observer: ConversionObserver = .none,
+        fileIndex: Int = 0,
+        fileCount: Int = 1
+    ) -> ConversionResult {
+        let started = Date()
+        var folder: URL?
+
+        do {
+            if cancellation.isCancelled { throw ConversionError(Localized.text("Cancelled.")) }
+
+            observer.onProgress?(
+                ConversionProgress(completedUnits: 0, totalUnits: 1, fileIndex: fileIndex, fileCount: fileCount)
+            )
+
+            let target = try outputFolder(for: document, settings: settings)
+            folder = target
+
+            let url = try DocumentConverter.convert(
+                url: document.url,
+                kind: document.kind,
+                to: target.appendingPathComponent(pdfFileName(for: document, settings: settings))
+            )
+
+            observer.onProgress?(
+                ConversionProgress(completedUnits: 1, totalUnits: 1, fileIndex: fileIndex, fileCount: fileCount)
+            )
+
+            return ConversionResult(
+                documentID: document.id,
+                outputFiles: [url],
+                outputFolder: folder,
+                producedCount: PDFRasterizer.pageCount(of: url),
+                duration: Date().timeIntervalSince(started)
+            )
+        } catch {
+            return ConversionResult(
+                documentID: document.id,
+                outputFolder: folder,
+                error: Self.conversionError(from: error),
+                duration: Date().timeIntervalSince(started)
             )
         }
     }

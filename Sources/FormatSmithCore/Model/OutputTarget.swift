@@ -113,8 +113,21 @@ public enum ConversionRouter {
             return ConversionPlan(kind: .imageToPDF)
 
         // 文档 → PDF
-        case (.office, .pdf), (.html, .pdf), (.markdown, .pdf), (.plainText, .pdf):
-            return ConversionPlan(kind: .documentToPDF, availability: .notImplementedYet)
+        case (.office, .pdf):
+            let tool = ToolLocator.libreOffice()
+            guard tool.isAvailable else {
+                return ConversionPlan(
+                    kind: .documentToPDF,
+                    availability: .unsupported(
+                        Localized.text("%@ is required for this file type. %@", tool.name, tool.installHint)
+                    )
+                )
+            }
+            return ConversionPlan(kind: .documentToPDF)
+
+        case (.html, .pdf), (.markdown, .pdf), (.plainText, .pdf):
+            // HTML / Markdown / 纯文本走系统 WebKit，不需要额外安装任何东西。
+            return ConversionPlan(kind: .documentToPDF)
 
         // 文档 → 图片：必须先经过 PDF
         case (.office, .image), (.html, .image), (.markdown, .image), (.plainText, .image):
