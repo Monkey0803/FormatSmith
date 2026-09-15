@@ -125,6 +125,17 @@ final class ConverterModel: ObservableObject {
         )
     }
 
+    /// 底部主按钮的标题：直接说清楚这次会做什么。
+    var actionTitle: String {
+        if model_isPDFTarget {
+            if hasPDFInputs { return settings.pdfTool.displayName }
+            return Localized.text("Create PDF")
+        }
+        return Localized.text("Convert Now")
+    }
+
+    private var model_isPDFTarget: Bool { target.isPDF }
+
     var canConvert: Bool {
         !items.isEmpty && !isConverting && !convertibleItems.isEmpty && unavailableReasons.isEmpty
     }
@@ -338,6 +349,8 @@ final class ConverterModel: ObservableObject {
         Task { @MainActor in
             if strategy == .imagesToOnePDF {
                 await self.runMerge(jobs: jobs, settings: snapshot, cancellation: flag, root: root)
+            } else if strategy == .pdfToolbox, snapshot.pdfTool.operatesOnWholeBatch, jobs.count > 1 {
+                await self.runPDFToolBatch(jobs: jobs, settings: snapshot, cancellation: flag, root: root)
             } else {
                 await self.runIndividually(jobs: jobs, settings: snapshot, cancellation: flag, root: root)
             }
@@ -442,6 +455,52 @@ final class ConverterModel: ObservableObject {
         )
     }
 
+    /// 需要整批处理的 PDF 工具（合并）：所有输入对应同一份输出。
+    private func runPDFToolBatch(
+        jobs: [(UUID, SourceDocument)],
+        settings snapshot: ConversionSettings,
+        cancellation flag: CancellationFlag,
+        root: URL
+    ) async {
+        for (documentID, _) in jobs {
+            markConverting(itemID: documentID, done: 0, total: 1)
+        }
+        statusText = Localized.text("Merging %d PDFs into one…", jobs.count)
+
+        let documents = jobs.map(\.1)
+        let observer = ConversionObserver(onProgress: { progress in
+            Task { @MainActor in
+                self.overallProgress = progress.fraction
+            }
+        })
+
+        let result = await Task.detached(priority: .userInitiated) {
+            ConversionEngine.runPDFTool(
+                documents: documents,
+                tool: snapshot.pdfTool,
+                settings: snapshot,
+                cancellation: flag,
+                observer: observer
+            )
+        }.value
+
+        for documentID in result.includedDocumentIDs {
+            apply(result, to: documentID)
+        }
+
+        finish(
+            finished: 1,
+            failures: result.error == nil ? 0 : 1,
+            cancelled: flag.isCancelled,
+            lastFolder: result.outputFolder ?? root,
+            settings: snapshot,
+            root: root,
+            successSummary: result.error == nil
+                ? Localized.text("Merged %d PDFs → %@", jobs.count, result.outputFiles.first?.lastPathComponent ?? "")
+                : nil
+        )
+    }
+
     // MARK: - 状态更新
 
     private func markConverting(itemID: UUID, done: Int, total: Int) {
@@ -465,7 +524,8 @@ final class ConverterModel: ObservableObject {
         lastFolder: URL,
         settings snapshot: ConversionSettings,
         root: URL,
-        mergedCount: Int = 0
+        mergedCount: Int = 0,
+        successSummary: String? = nil
     ) {
         isConverting = false
         overallProgress = cancelled ? 0 : 1
@@ -475,6 +535,9 @@ final class ConverterModel: ObservableObject {
             statusText = Localized.text("Cancelled.")
         } else if failures > 0 {
             statusText = Localized.text("Finished with %d failure(s).", failures)
+        } else if let successSummary {
+            statusText = successSummary
+            if snapshot.openFolderWhenFinished { openOutputFolder() }
         } else if mergedCount > 0 {
             statusText = Localized.text("Merged %d images → %@", mergedCount, lastFolder.path)
             if snapshot.openFolderWhenFinished { openOutputFolder() }

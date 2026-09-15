@@ -118,12 +118,185 @@ public enum ConversionEngine {
                 fileCount: fileCount
             )
 
-        case .documentToPDF, .pdfToolbox, .imagesToOnePDF:
+        case .pdfToolbox:
+            return runPDFTool(
+                documents: [document],
+                tool: settings.pdfTool,
+                settings: settings,
+                cancellation: cancellation,
+                observer: observer,
+                fileIndex: fileIndex,
+                fileCount: fileCount
+            )
+
+        case .documentToPDF, .imagesToOnePDF:
             return ConversionResult(
                 documentID: document.id,
                 error: ConversionError(plan.unavailableReason ?? Localized.text("Not available in this build yet."))
             )
         }
+    }
+
+    // MARK: - PDF 工具箱
+
+    /// 执行 PDF 结构操作。
+    ///
+    /// - Parameter documents: `.merge` 会把全部输入合成一个文件；其余操作每个输入各自产出一份。
+    public static func runPDFTool(
+        documents: [SourceDocument],
+        tool: PDFTool,
+        settings: ConversionSettings,
+        cancellation: CancellationFlag,
+        observer: ConversionObserver = .none,
+        fileIndex: Int = 0,
+        fileCount: Int = 1
+    ) -> ConversionResult {
+        let started = Date()
+        let primaryID = documents.first?.id ?? UUID()
+        let ids = documents.map(\.id)
+
+        guard let first = documents.first else {
+            return ConversionResult(
+                documentID: primaryID,
+                error: ConversionError(Localized.text("There is nothing to convert."))
+            )
+        }
+
+        do {
+            switch tool {
+            case .merge:
+                let folder = try outputFolder(for: first, settings: settings)
+                let observerBox = ProgressReporter(observer: observer, fileIndex: fileIndex, fileCount: fileCount)
+                let url = try PDFToolkit.merge(
+                    urls: documents.map(\.url),
+                    to: folder.appendingPathComponent(mergedFileName(for: documents, settings: settings)),
+                    cancellation: cancellation,
+                    onPageCopied: { done, total in
+                        observerBox.report(completed: done, total: total)
+                    }
+                )
+                return ConversionResult(
+                    documentID: primaryID,
+                    outputFiles: [url],
+                    outputFolder: folder,
+                    producedCount: documents.count,
+                    duration: Date().timeIntervalSince(started),
+                    includedDocumentIDs: ids
+                )
+
+            case .split:
+                let folder = try outputFolder(for: first, settings: settings)
+                let observerBox = ProgressReporter(observer: observer, fileIndex: fileIndex, fileCount: fileCount)
+                let urls = try PDFToolkit.split(
+                    url: first.url,
+                    every: settings.splitEveryPages,
+                    into: folder,
+                    settings: settings,
+                    cancellation: cancellation,
+                    onPartWritten: { done, total in observerBox.report(completed: done, total: total) }
+                )
+                return ConversionResult(
+                    documentID: primaryID,
+                    outputFiles: urls,
+                    outputFolder: folder,
+                    producedCount: urls.count,
+                    duration: Date().timeIntervalSince(started)
+                )
+
+            case .extract:
+                let folder = try outputFolder(for: first, settings: settings)
+                let pageCount = PDFRasterizer.pageCount(of: first.url)
+                let pages = settings.pages(outOf: pageCount)
+                let observerBox = ProgressReporter(observer: observer, fileIndex: fileIndex, fileCount: fileCount)
+                let url = try PDFToolkit.extract(
+                    url: first.url,
+                    pages: pages,
+                    to: folder.appendingPathComponent(pdfFileName(for: first, settings: settings)),
+                    cancellation: cancellation,
+                    onPageCopied: { done, total in observerBox.report(completed: done, total: total) }
+                )
+                return ConversionResult(
+                    documentID: primaryID,
+                    outputFiles: [url],
+                    outputFolder: folder,
+                    producedCount: pages.count,
+                    duration: Date().timeIntervalSince(started)
+                )
+
+            case .rotate:
+                let folder = try outputFolder(for: first, settings: settings)
+                let observerBox = ProgressReporter(observer: observer, fileIndex: fileIndex, fileCount: fileCount)
+                let url = try PDFToolkit.rotate(
+                    url: first.url,
+                    degrees: settings.rotationAngle.rawValue,
+                    to: folder.appendingPathComponent(pdfFileName(for: first, settings: settings)),
+                    cancellation: cancellation,
+                    onPageRotated: { done, total in observerBox.report(completed: done, total: total) }
+                )
+                return ConversionResult(
+                    documentID: primaryID,
+                    outputFiles: [url],
+                    outputFolder: folder,
+                    producedCount: PDFRasterizer.pageCount(of: first.url),
+                    duration: Date().timeIntervalSince(started)
+                )
+
+            case .compress:
+                let folder = try outputFolder(for: first, settings: settings)
+                let observerBox = ProgressReporter(observer: observer, fileIndex: fileIndex, fileCount: fileCount)
+                let url = try PDFToolkit.compress(
+                    url: first.url,
+                    settings: settings,
+                    to: folder.appendingPathComponent(pdfFileName(for: first, settings: settings)),
+                    cancellation: cancellation,
+                    onPageWritten: { done, total in observerBox.report(completed: done, total: total) }
+                )
+                return ConversionResult(
+                    documentID: primaryID,
+                    outputFiles: [url],
+                    outputFolder: folder,
+                    producedCount: PDFRasterizer.pageCount(of: first.url),
+                    duration: Date().timeIntervalSince(started)
+                )
+            }
+        } catch {
+            return ConversionResult(
+                documentID: primaryID,
+                error: Self.conversionError(from: error),
+                duration: Date().timeIntervalSince(started),
+                includedDocumentIDs: ids
+            )
+        }
+    }
+
+    /// 合并输出的文件名。
+    ///
+    /// 合并 PDF 时若沿用它自己的名字会得到「a.pdf → a.pdf」这种让人困惑的结果，
+    /// 因此当展开结果与第一个输入同名时补一个 -merged。
+    static func mergedFileName(for documents: [SourceDocument], settings: ConversionSettings) -> String {
+        let base = OutputNaming.expand(
+            pattern: settings.filenamePattern,
+            documentName: documents.first?.displayName ?? "output",
+            page: nil,
+            pageCount: documents.count,
+            padsPageNumbers: settings.padsPageNumbers
+        )
+        if documents.count > 1, base == documents.first?.displayName {
+            return "\(base)-merged.pdf"
+        }
+        return "\(base).pdf"
+    }
+
+    /// 单文件 PDF 输出的文件名。
+    static func pdfFileName(for document: SourceDocument, settings: ConversionSettings) -> String {
+        let base = OutputNaming.expand(
+            pattern: settings.filenamePattern,
+            documentName: document.displayName,
+            page: nil,
+            pageCount: nil,
+            padsPageNumbers: settings.padsPageNumbers
+        )
+        return "\(base).pdf"
     }
 
     // MARK: - 图片 → 图片
@@ -220,8 +393,10 @@ public enum ConversionEngine {
             var pages: [PDFComposer.Page] = []
             for (offset, document) in documents.enumerated() {
                 if cancellation.isCancelled { throw ConversionError(Localized.text("Cancelled.")) }
+                // 图片按原始像素嵌入：DPI 是给 PDF 页面用的概念，
+                // 套到图片上会让「默认 200 DPI」悄悄把照片放大 2.78 倍。
                 let image = try ImageDecoder.decode(
-                    url: document.url, scale: settings.imageScale, maxPixels: settings.maxPixels)
+                    url: document.url, scale: 1, maxPixels: settings.maxPixels)
                 pages.append(PDFComposer.Page(image: image))
                 observer.onProgress?(
                     ConversionProgress(
@@ -234,10 +409,7 @@ public enum ConversionEngine {
             }
 
             let folder = try outputFolder(for: first, settings: settings)
-            let fileName = outputNamingForPDF(
-                documents: documents,
-                settings: settings
-            )
+            let fileName = mergedFileName(for: documents, settings: settings)
             let url = try PDFComposer.compose(
                 pages: pages,
                 settings: settings,
@@ -261,19 +433,6 @@ public enum ConversionEngine {
                 includedDocumentIDs: ids
             )
         }
-    }
-
-    /// 输出 PDF 的文件名：沿用同一套模板，`{page}` 在单文件输出下会被去掉。
-    /// 合并多张时把总张数写进 `{total}`。
-    static func outputNamingForPDF(documents: [SourceDocument], settings: ConversionSettings) -> String {
-        let base = OutputNaming.expand(
-            pattern: settings.filenamePattern,
-            documentName: documents.first?.displayName ?? "output",
-            page: nil,
-            pageCount: documents.count,
-            padsPageNumbers: settings.padsPageNumbers
-        )
-        return "\(base).pdf"
     }
 
     // MARK: - PDF → 图片

@@ -63,7 +63,7 @@ struct BottomBarView: View {
                     Button {
                         model.startConversion()
                     } label: {
-                        Label(Localized.text("Convert Now"), systemImage: "wand.and.sparkles")
+                        Label(model.actionTitle, systemImage: "wand.and.sparkles")
                             .frame(minWidth: 92)
                     }
                     .controlSize(.large)

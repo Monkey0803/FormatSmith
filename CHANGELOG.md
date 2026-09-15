@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- PDF toolbox: merge several PDFs, split every N pages, extract a page selection, rotate by
+  90/180/270°, and compress by re-rasterising at a lower DPI. Available from the app's PDF tool
+  picker and from the CLI (`--pdf-tool`, `--split-every`, `--rotate`).
 - Image → image conversion: any readable format to any writable one, with scaling from 0.5× to 4×
   (or any custom factor). WebP, JPEG XL, HEIC and camera RAW files can now be used as input.
 - Image → PDF conversion, including merging a multi-file selection into one document. Page size can
@@ -32,6 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Output file names for JPEG now use the `.jpg` extension (the system reports `.jpeg`).
 - CLI output is always English, whatever the system language, so scripts can parse it. The app window
   remains localized.
+- Images embedded in a PDF are no longer silently upscaled: they are placed at their native pixel
+  size, because DPI is a PDF concept and the 200 DPI default was scaling photos by 2.78×.
 - The CLI writes straight into `--out` by default; pass `--subfolder` for a folder per source file.
   The app keeps per-file folders on by default.
 - `InputKind` recognises image files by extension when no UTType is available.

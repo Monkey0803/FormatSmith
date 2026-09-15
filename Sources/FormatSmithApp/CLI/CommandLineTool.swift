@@ -119,6 +119,31 @@ enum CommandLineTool {
                     settings.pdfMargin = max(0, number)
                 }
 
+            case "--pdf-tool":
+                if let value = nextValue(argument) {
+                    guard let tool = PDFTool(rawValue: value.lowercased()) else {
+                        fail("Unknown PDF tool: \(value). Use merge, split, extract, rotate or compress.")
+                    }
+                    settings.target = .pdf
+                    settings.pdfTool = tool
+                }
+
+            case "--split-every":
+                if let value = nextValue(argument), let number = Int(value) {
+                    settings.splitEveryPages = max(1, number)
+                }
+
+            case "--rotate":
+                if let value = nextValue(argument), let degrees = Int(value) {
+                    let normalized = ((degrees % 360) + 360) % 360
+                    guard let angle = RotationAngle(rawValue: normalized) else {
+                        fail("Rotation must be 90, 180 or 270 degrees.")
+                    }
+                    settings.target = .pdf
+                    settings.pdfTool = .rotate
+                    settings.rotationAngle = angle
+                }
+
             case "--pdf-compress":
                 settings.pdfCompressesImages = true
 
@@ -209,6 +234,8 @@ enum CommandLineTool {
 
         if strategy == .imagesToOnePDF {
             failures += mergeIntoOnePDF(documents: documents, settings: settings, cancellation: cancellation)
+        } else if strategy == .pdfToolbox, settings.pdfTool.operatesOnWholeBatch, documents.count > 1 {
+            failures += runPDFToolOnBatch(documents: documents, settings: settings, cancellation: cancellation)
         } else {
             failures += convertIndividually(documents: documents, settings: settings, cancellation: cancellation)
         }
@@ -243,6 +270,9 @@ enum CommandLineTool {
                 FileHandle.standardError.write(
                     "✗ \(document.url.lastPathComponent): \(error.message)\n".data(using: .utf8)!)
                 failures += 1
+            } else if result.outputFiles.count == 1, let output = result.outputFiles.first {
+                // 单文件输出（提取、旋转、压缩、图片转 PDF）报文件本身，别报「1 个文件」
+                print("✓ \(document.url.lastPathComponent) → \(output.path)")
             } else {
                 let folder = result.outputFolder?.path ?? settings.resolvedOutputDirectory.path
                 print("✓ \(document.url.lastPathComponent) → \(result.producedCount) file(s)  \(folder)")
@@ -272,6 +302,33 @@ enum CommandLineTool {
         }
         if let output = result.outputFiles.first {
             print("✓ merged \(documents.count) image(s) → \(output.path)")
+        }
+        return 0
+    }
+
+    private static func runPDFToolOnBatch(
+        documents: [SourceDocument],
+        settings: ConversionSettings,
+        cancellation: CancellationFlag
+    ) -> Int {
+        let printer = ProgressPrinter(fileName: "\(documents.count) PDFs")
+        let observer = ConversionObserver(onProgress: { printer.report($0) })
+
+        let result = ConversionEngine.runPDFTool(
+            documents: documents,
+            tool: settings.pdfTool,
+            settings: settings,
+            cancellation: cancellation,
+            observer: observer
+        )
+
+        if let error = result.error {
+            FileHandle.standardError.write(
+                "✗ \(settings.pdfTool.rawValue) failed: \(error.message)\n".data(using: .utf8)!)
+            return 1
+        }
+        for url in result.outputFiles {
+            print("✓ \(settings.pdfTool.rawValue) → \(url.path)")
         }
         return 0
     }
@@ -326,6 +383,13 @@ enum CommandLineTool {
               --pattern <template>  {name} {page} {total} {date} {time}
               --background <c>      white | black | transparent
               --subfolder           Create a subfolder per source file
+              PDF toolbox (input and output are both PDF):
+              --pdf-tool <tool>     merge | split | extract | rotate | compress
+              --split-every <n>     Pages per file when splitting (default 1)
+              --rotate <deg>        90 | 180 | 270
+              --pages <range>       Page range used by --pdf-tool extract
+
+            Images to PDF:
               --pdf-page-size <s>   fit | a4 | letter   (default: fit)
               --pdf-margin <pt>     Margin for fixed page sizes (default: 24)
               --pdf-compress        JPEG-compress embedded images to shrink the PDF

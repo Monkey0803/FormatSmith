@@ -11,14 +11,19 @@ struct ConversionSettingsPanel: View {
             VStack(alignment: .leading, spacing: 16) {
                 targetSection
                 if model.target.isPDF {
-                    pdfLayoutSection
-                    pdfCompressionSection
+                    if model.hasPDFInputs {
+                        pdfToolSection
+                    }
+                    if model.hasImageInputs {
+                        pdfLayoutSection
+                        pdfCompressionSection
+                    }
                 } else {
                     qualitySection
                     resolutionSection
                     backgroundSection
                 }
-                if model.hasPDFInputs, !model.target.isPDF {
+                if showPageRangeSection {
                     pageRangeSection
                 }
                 outputSection
@@ -92,6 +97,9 @@ struct ConversionSettingsPanel: View {
 
     private var targetSummary: String {
         if model.target.isPDF {
+            if model.hasPDFInputs {
+                return model.settings.pdfTool.summary
+            }
             if model.hasImageInputs, model.settings.mergeImagesIntoOnePDF, model.convertibleItems.count > 1 {
                 return Localized.text("All images are merged into a single PDF.")
             }
@@ -215,6 +223,116 @@ struct ConversionSettingsPanel: View {
                 Text(Localized.text("%@ cannot store transparency, so a solid background is used.", format.displayName))
                     .font(.system(size: 11))
                     .foregroundStyle(.tertiary)
+            }
+        }
+    }
+
+    /// 页码范围在两种情况下有意义：PDF 转图片，以及 PDF 工具箱里的「提取页」。
+    private var showPageRangeSection: Bool {
+        guard model.hasPDFInputs else { return false }
+        if model.target.isPDF {
+            return model.settings.pdfTool == .extract
+        }
+        return true
+    }
+
+    // MARK: PDF 工具箱
+
+    private var pdfToolSection: some View {
+        SettingsCard(title: Localized.text("PDF tool"), systemImage: "wrench.and.screwdriver") {
+            Picker(
+                "",
+                selection: Binding(
+                    get: { model.settings.pdfTool },
+                    set: { model.settings.pdfTool = $0 }
+                )
+            ) {
+                ForEach(PDFTool.allCases) { tool in
+                    Text(tool.displayName).tag(tool)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+
+            Text(model.settings.pdfTool.summary)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            switch model.settings.pdfTool {
+            case .merge:
+                if model.convertibleItems.count < 2 {
+                    Text(Localized.text("Add at least two PDFs to merge; with one file this just copies it."))
+                        .font(.system(size: 11))
+                        .foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+            case .split:
+                HStack(spacing: 8) {
+                    Text(Localized.text("Pages per file"))
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                    TextField(
+                        "",
+                        value: Binding(
+                            get: { model.settings.splitEveryPages },
+                            set: { model.settings.splitEveryPages = min(max($0, 1), 5000) }
+                        ), format: .number
+                    )
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 64)
+                    Spacer()
+                }
+
+            case .extract:
+                EmptyView()
+
+            case .rotate:
+                Picker(
+                    "",
+                    selection: Binding(
+                        get: { model.settings.rotationAngle },
+                        set: { model.settings.rotationAngle = $0 }
+                    )
+                ) {
+                    ForEach(RotationAngle.allCases) { angle in
+                        Text(angle.displayName).tag(angle)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+
+            case .compress:
+                PresetChipRow(
+                    values: [72, 100, 150, 200],
+                    selected: model.settings.dpi,
+                    label: { "\(Int($0))" }
+                ) { model.settings.dpi = $0 }
+
+                HStack(spacing: 8) {
+                    Text("DPI")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                    TextField(
+                        "",
+                        value: Binding(
+                            get: { model.settings.dpi },
+                            set: { model.settings.dpi = min(max($0, 18), 600) }
+                        ), format: .number
+                    )
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 64)
+                    Spacer()
+                }
+
+                Label(
+                    Localized.text("Compressing turns each page into an image: text is no longer selectable."),
+                    systemImage: "exclamationmark.triangle.fill"
+                )
+                .font(.system(size: 11))
+                .foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -446,7 +564,11 @@ struct ConversionSettingsPanel: View {
         SettingsCard(title: Localized.text("Preview"), systemImage: "eye") {
             if let first = model.items.first(where: { $0.document.size.width > 0 }) {
                 VStack(alignment: .leading, spacing: 5) {
-                    if model.target.isPDF {
+                    if model.target.isPDF, model.hasPDFInputs {
+                        previewRow(Localized.text("PDF tool"), model.settings.pdfTool.displayName)
+                        previewRow(Localized.text("First file"), pdfToolOutcome())
+                        previewRow(Localized.text("Example name"), examplePDFName(for: first), monospaced: true)
+                    } else if model.target.isPDF {
                         previewRow(Localized.text("PDF page"), pdfPageDescription(for: first))
                         previewRow(Localized.text("First file"), Localized.text("%d page(s)", pagesForPreview))
                         previewRow(Localized.text("Example name"), examplePDFName(for: first), monospaced: true)
@@ -481,6 +603,26 @@ struct ConversionSettingsPanel: View {
                     .font(.system(size: 11))
                     .foregroundStyle(.tertiary)
             }
+        }
+    }
+
+    /// PDF 工具会产出什么，用一句话说清楚。
+    private func pdfToolOutcome() -> String {
+        let pageCount = referencePageCount
+        switch model.settings.pdfTool {
+        case .merge:
+            let total = model.items.reduce(0) { $0 + $1.document.pageCount }
+            return Localized.text("%d page(s) → 1 file", total)
+        case .split:
+            let parts = max(1, Int(ceil(Double(pageCount) / Double(max(1, model.settings.splitEveryPages)))))
+            return Localized.text("%d page(s) → %d file(s)", pageCount, parts)
+        case .extract:
+            let selected = model.settings.pages(outOf: pageCount).count
+            return Localized.text("%d of %d page(s)", selected, pageCount)
+        case .rotate:
+            return Localized.text("%d page(s)", pageCount)
+        case .compress:
+            return Localized.text("%d page(s) at %d DPI", pageCount, Int(model.settings.dpi))
         }
     }
 

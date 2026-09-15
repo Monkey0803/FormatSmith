@@ -153,6 +153,45 @@ expect_exit 0 $? "one PDF per image when merging is off"
 expect_file "$OUT/sample-1.pdf" "first separate PDF"
 expect_file "$OUT/sample-2.pdf" "second separate PDF"
 
+echo "▶ PDF toolbox…"
+TOOLS="$WORK/tools"
+mkdir -p "$TOOLS"
+swift "$ROOT/scripts/make-sample-pdf.swift" "$TOOLS/b.pdf" 2 >/dev/null
+
+OUT="$TOOLS/merge"
+"$BIN" --convert "$SAMPLE" "$TOOLS/b.pdf" --pdf-tool merge --out "$OUT" --pattern "combined" >/dev/null 2>&1
+expect_exit 0 $? "merge two PDFs"
+expect_file "$OUT/combined.pdf" "merged PDF written"
+
+OUT="$TOOLS/split"
+"$BIN" --convert "$SAMPLE" --pdf-tool split --split-every 2 --out "$OUT" --pattern "{name}-{page}" >/dev/null 2>&1
+expect_exit 0 $? "split every 2 pages"
+expect_file "$OUT/sample-1.pdf" "first split part"
+expect_file "$OUT/sample-3.pdf" "second split part"
+
+OUT="$TOOLS/extract"
+"$BIN" --convert "$SAMPLE" --pdf-tool extract --pages 1,3 --out "$OUT" --pattern "picked" >/dev/null 2>&1
+expect_exit 0 $? "extract pages 1 and 3"
+expect_file "$OUT/picked.pdf" "extracted PDF written"
+
+OUT="$TOOLS/rotate"
+"$BIN" --convert "$SAMPLE" --pdf-tool rotate --rotate 90 --out "$OUT" --pattern "rotated" >/dev/null 2>&1
+expect_exit 0 $? "rotate 90 degrees"
+expect_file "$OUT/rotated.pdf" "rotated PDF written"
+# sips 报的是 MediaBox（400×300），不含 /Rotate，所以直接确认旋转角度写进去了；
+# 「显示尺寸互换」由单测 PDFToolkitTests.testRotate90SwapsDisplayedPageSize 覆盖。
+if grep -aq "/Rotate 90" "$OUT/rotated.pdf"; then
+    pass "rotation written into the page dictionary"
+else
+    fail "rotated PDF does not contain /Rotate 90"
+fi
+
+OUT="$TOOLS/compress"
+"$BIN" --convert "$SAMPLE" --pdf-tool compress --dpi 72 --pdf-compress --quality 0.5 \
+    --out "$OUT" --pattern "small" >/dev/null 2>&1
+expect_exit 0 $? "compress"
+expect_file "$OUT/small.pdf" "compressed PDF written"
+
 echo "▶ Error handling…"
 "$BIN" --convert "$WORK/does-not-exist.pdf" --format png --out "$WORK/none" >/dev/null 2>&1
 expect_exit 1 $? "missing input file"
@@ -171,13 +210,20 @@ else
     fail "WebP rejection message is unhelpful: $WEBP_MSG"
 fi
 
-# 路线图上的功能要先明确说「还没有」，而不是静默失败
-PDF2PDF_MSG="$("$BIN" --convert "$SAMPLE" --to pdf --out "$WORK/none" 2>&1)"
-if printf '%s' "$PDF2PDF_MSG" | grep -qi "not available"; then
-    pass "unimplemented route reports clearly"
+# 文档输入仍未实现，必须明确说明而不是静默失败
+printf 'hello' > "$WORK/notes.md"
+DOC_MSG="$("$BIN" --convert "$WORK/notes.md" --to pdf --out "$WORK/none" 2>&1)"
+if printf '%s' "$DOC_MSG" | grep -qi "not supported yet"; then
+    pass "unsupported input reports clearly"
 else
-    fail "PDF → PDF message is unclear: $PDF2PDF_MSG"
+    fail "document input message is unclear: $DOC_MSG"
 fi
+
+# PDF → PDF 现在默认是「合并」，单个输入等同于复制一份
+OUT="$WORK/pdfcopy"
+"$BIN" --convert "$SAMPLE" --to pdf --out "$OUT" --pattern "copy" >/dev/null 2>&1
+expect_exit 0 $? "PDF to PDF defaults to merge/copy"
+expect_file "$OUT/copy.pdf" "copied PDF written"
 
 echo "▶ Version and help…"
 "$BIN" --version >/dev/null 2>&1

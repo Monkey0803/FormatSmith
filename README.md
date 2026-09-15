@@ -4,8 +4,9 @@
 locally through Apple's own frameworks — nothing is uploaded, and there is no third-party dependency
 in the app itself.
 
-> Status: **PDF → image**, **image → image** and **image → PDF** work today, in both the app and the
-> CLI. The remaining directions are being built in the open; see the [roadmap](#roadmap).
+> Status: **PDF → image**, **image → image**, **image → PDF** and the **PDF toolbox** work today, in
+> both the app and the CLI. Document conversion is being built in the open; see the
+> [roadmap](#roadmap).
 
 ## Features
 
@@ -24,6 +25,9 @@ in the app itself.
   with a page size that either matches the image or fits A4/Letter with a margin. Embed losslessly, or
   JPEG-compress the images to keep the file small.
 - **Images → images**: convert between formats and scale up or down (50%–400% or any custom factor).
+- **PDF toolbox**: merge several PDFs, split one every N pages, extract just the pages you list,
+  rotate every page by 90/180/270°, or compress by re-rasterising at a lower DPI. Compressing is
+  lossy by design and the app says so before you run it.
 - **A real CLI** in the same binary, for scripts and batch jobs. Its output stays in English
   regardless of system language, so scripts can rely on it.
 
@@ -95,6 +99,9 @@ dist/FormatSmith.app/Contents/MacOS/FormatSmith --list-formats
 | `--pdf-margin <pt>` | Margin for fixed page sizes (default `24`) |
 | `--pdf-compress` | JPEG-compress embedded images to shrink the PDF |
 | `--merge` / `--no-merge` | Merge several images into one PDF (default: merge) |
+| `--pdf-tool <tool>` | `merge`, `split`, `extract`, `rotate`, or `compress` (PDF in, PDF out) |
+| `--split-every <n>` | Pages per file when splitting |
+| `--rotate <deg>` | `90`, `180`, or `270` |
 | `--list-formats` | List output formats available on this Mac |
 | `--version`, `--help` | Version / usage |
 
@@ -108,10 +115,8 @@ Set `FORMATSMITH_DEBUG=1` for a trace of file intake and metadata reads.
 - [x] PDF → image (PNG, JPEG, HEIC, AVIF, TIFF, GIF, BMP, …)
 - [x] Image → image, including WebP, JPEG XL, HEIC and RAW input
 - [x] Image → PDF (combine several images into one document)
-- [ ] PDF toolbox: merge, split, extract pages, rotate, compress
+- [x] PDF toolbox: merge, split, extract pages, rotate, compress
 - [ ] Documents → PDF (Office via LibreOffice, HTML natively, Markdown via pandoc)
-- [ ] Presets, concurrent conversion, and dragging results out to Finder
-
 Video and audio conversion is explicitly **not** in scope — that is a different stack, and it would
 make this a different app.
 
@@ -157,7 +162,7 @@ everywhere or reported as unavailable everywhere:
 | Input | Target | Pipeline |
 | --- | --- | --- |
 | PDF | image | Rasterise each page at the chosen DPI |
-| PDF | PDF | PDF toolbox (planned) |
+| PDF | PDF | `PDFToolkit`: merge, split, extract, rotate, compress |
 | image | image | Decode, scale, re-encode |
 | image | PDF | `PDFComposer`, optionally merging several files |
 | Office / HTML / Markdown | PDF | Planned; documents → images is rejected with an explanation |
@@ -167,6 +172,15 @@ everywhere or reported as unavailable everywhere:
 Issues and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). The short version:
 `swift test` must pass, and `swift format lint --configuration .swift-format --recursive Sources Tests`
 must be clean.
+
+## Known limitations
+
+- **Compress is lossy.** It re-rasterises each page, so text stops being selectable and vector art is
+  flattened. The app labels it as lossy; there is no "lossless shrink" mode.
+- **WebP and JPEG XL can be read but not written**, because macOS itself does not write them. Rather
+  than bundle a third-party encoder, the app leaves them out of the output list and says why.
+- **Office documents need LibreOffice**, which is not installed for you. (Not wired up yet.)
+- Builds are ad-hoc signed, not notarized, so the first launch needs a right-click → Open.
 
 ## License
 

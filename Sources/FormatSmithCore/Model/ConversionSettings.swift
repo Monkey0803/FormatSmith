@@ -114,6 +114,14 @@ public struct ConversionSettings: Codable, Equatable, Sendable {
     /// 并发转换的文件数上限。0 表示自动（`min(核数, 4)`）。
     public var maxConcurrentFiles: Int = 0
 
+    // PDF 工具箱
+    /// 当输入与输出都是 PDF 时执行哪个操作。
+    public var pdfTool: PDFTool = .merge
+    /// 拆分时每多少页一个文件。
+    public var splitEveryPages: Int = 1
+    /// 旋转角度。
+    public var rotationAngle: RotationAngle = .clockwise90
+
     // 图片 → PDF
     /// 多张图片是否合并成一个多页 PDF。
     public var mergeImagesIntoOnePDF: Bool = true
