@@ -92,11 +92,16 @@ PY
 
 echo "▶ Committing and tagging…"
 git add VERSION CHANGELOG.md
-git commit -q -m "chore(release): 发布 $VERSION
+if git diff --cached --quiet; then
+    # VERSION 与 CHANGELOG 已经是这个版本了（例如手工改过），直接打 tag。
+    echo "  VERSION and CHANGELOG already at $VERSION; nothing to commit"
+else
+    git commit -q -m "chore(release): 发布 $VERSION
 
 - 将 VERSION 提升到 $VERSION
 - 在 CHANGELOG 中固化 $VERSION 的发布条目
 "
+fi
 git tag -a "v$VERSION" -m "$APP_NAME $VERSION"
 
 echo "▶ Pushing main and the tag…"
