@@ -8,7 +8,7 @@ import Foundation
 ///   必须用嵌套 runloop 边等边跑。
 ///
 /// 少了后一种情况，命令行里的 HTML → PDF 会直接死锁。
-enum MainThreadBridge {
+public enum MainThreadBridge {
 
     private final class Box<T>: @unchecked Sendable {
         private let lock = NSLock()
@@ -27,21 +27,51 @@ enum MainThreadBridge {
         }
     }
 
-    static func run<T: Sendable>(
+    /// 在同步上下文里等待一段**不要求主 actor** 的异步工作。
+    ///
+    /// 命令行入口就是这种情况：它必须在主线程上同步等待，但又不能真的把主线程堵死，
+    /// 因为批次里可能有 HTML 文档，而 WebKit 的回调要靠主线程跑。
+    /// 主线程上阻塞等待 = 和 `run` 里的主线程动作互相锁死。
+    public static func await<T: Sendable>(
+        timeout: TimeInterval = 3600,
+        _ work: @escaping @Sendable () async throws -> T
+    ) throws -> T {
+        try wait(timeout: timeout) { box, signal in
+            Task {
+                do {
+                    box.set(.success(try await work()))
+                } catch {
+                    box.set(.failure(error))
+                }
+                signal()
+            }
+        }
+    }
+
+    public static func run<T: Sendable>(
         timeout: TimeInterval = 120,
         _ work: @escaping @MainActor () async throws -> T
     ) throws -> T {
+        try wait(timeout: timeout) { box, signal in
+            Task { @MainActor in
+                do {
+                    box.set(.success(try await work()))
+                } catch {
+                    box.set(.failure(error))
+                }
+                signal()
+            }
+        }
+    }
+
+    /// 共用的等待逻辑：主线程上边跑 runloop 边等，其他线程直接等信号量。
+    private static func wait<T: Sendable>(
+        timeout: TimeInterval,
+        start: (Box<T>, @escaping @Sendable () -> Void) -> Void
+    ) throws -> T {
         let semaphore = DispatchSemaphore(value: 0)
         let box = Box<T>()
-
-        Task { @MainActor in
-            do {
-                box.set(.success(try await work()))
-            } catch {
-                box.set(.failure(error))
-            }
-            semaphore.signal()
-        }
+        start(box) { semaphore.signal() }
 
         let deadline = Date().addingTimeInterval(timeout)
         if Thread.isMainThread {

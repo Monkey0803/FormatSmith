@@ -50,6 +50,8 @@ final class ConverterModel: ObservableObject {
     @Published var showsAllFormats = false
 
     private let cancellation = CancellationFlag()
+    /// 每个正在转换的文件内部的进度，用于并发时合成整体进度。
+    private var inFlightProgress: [UUID: Double] = [:]
     private let defaultsKey = "FormatSmith.settings.v2"
 
     init() {
@@ -174,6 +176,22 @@ final class ConverterModel: ObservableObject {
         !items.isEmpty && !isConverting && !convertibleItems.isEmpty && unavailableReasons.isEmpty
     }
 
+    // MARK: - 预设
+
+    func apply(_ preset: Preset) {
+        var updated = settings
+        preset.apply(to: &updated)
+        settings = updated
+        statusText = Localized.text("Applied preset: %@", preset.name)
+    }
+
+    /// 当前设置是否正好等于某个预设。
+    func matches(_ preset: Preset) -> Bool {
+        var candidate = settings
+        preset.apply(to: &candidate)
+        return candidate == settings
+    }
+
     // MARK: - 队列
 
     func add(urls: [URL]) {
@@ -188,7 +206,7 @@ final class ConverterModel: ObservableObject {
             added.append(QueueItem(document: .make(from: url)))
         }
 
-        DebugLog.log("add(urls: \(urls.count)) → 新增 \(added.count) 项")
+        DebugLog.log("add(urls: \(urls.count)) → \(added.count) new item(s)")
         guard !added.isEmpty else { return }
         items.append(contentsOf: added)
         statusText = Localized.text("Added %d file(s).", added.count)
@@ -264,7 +282,8 @@ final class ConverterModel: ObservableObject {
                     ? .ready
                     : .failed(Localized.text("Could not read this file."))
                 DebugLog.log(
-                    "读取 \(url.lastPathComponent): \(loaded.0.kind.displayName), \(loaded.0.pageCount) 页/帧, "
+                    "inspected \(url.lastPathComponent): \(loaded.0.kind.displayName), "
+                        + "\(loaded.0.pageCount) page(s)/frame(s), "
                         + "\(Int(loaded.0.displaySize.width))×\(Int(loaded.0.displaySize.height))"
                 )
             }
@@ -392,58 +411,99 @@ final class ConverterModel: ObservableObject {
     }
 
     /// 每个文件各自产出（PDF → 图片、图片 → 图片、单图 → PDF）。
+    ///
+    /// 并发调度交给 `ConversionEngine.convertBatch`，这里只负责把进度写回界面。
     private func runIndividually(
         jobs: [(UUID, SourceDocument)],
         settings snapshot: ConversionSettings,
         cancellation flag: CancellationFlag,
         root: URL
     ) async {
-        var finished = 0
-        var failures = 0
-        var lastFolder: URL?
+        let limit = ConversionEngine.automaticConcurrency(configured: snapshot.maxConcurrentFiles)
+        inFlightProgress.removeAll()
 
-        for (index, job) in jobs.enumerated() {
-            if flag.isCancelled { break }
-            let (documentID, document) = job
+        statusText =
+            limit > 1
+            ? Localized.text("Converting %d file(s), %d at a time…", jobs.count, limit)
+            : Localized.text("Converting %d file(s)…", jobs.count)
 
+        for (documentID, document) in jobs {
             markConverting(itemID: documentID, done: 0, total: max(document.pageCount, 1))
-            statusText = Localized.text("Converting: %@", document.displayName)
-
-            let observer = ConversionObserver(onProgress: { progress in
-                Task { @MainActor in
-                    guard let idx = self.items.firstIndex(where: { $0.id == documentID }) else { return }
-                    self.items[idx].status = .converting(done: progress.completedUnits, total: progress.totalUnits)
-                    self.overallProgress = progress.fraction
-                }
-            })
-
-            let result = await Task.detached(priority: .userInitiated) {
-                ConversionEngine.convert(
-                    document: document,
-                    target: snapshot.target,
-                    settings: snapshot,
-                    cancellation: flag,
-                    observer: observer,
-                    fileIndex: index,
-                    fileCount: jobs.count
-                )
-            }.value
-
-            if let folder = result.outputFolder { lastFolder = folder }
-            apply(result, to: documentID)
-            if result.error != nil { failures += 1 }
-            finished += 1
-            overallProgress = Double(finished) / Double(jobs.count)
         }
 
+        // 进度回调来自工作线程，统一跳回主线程写状态。
+        let observer = ConversionObserver(
+            onProgress: { progress in
+                guard let documentID = progress.documentID else { return }
+                Task { @MainActor in
+                    self.recordProgress(
+                        documentID: documentID,
+                        completed: progress.completedUnits,
+                        total: progress.totalUnits,
+                        fileCount: jobs.count
+                    )
+                }
+            },
+            onFileFinished: { result in
+                Task { @MainActor in
+                    self.recordFinished(result, fileCount: jobs.count)
+                }
+            }
+        )
+
+        let results = await ConversionEngine.convertBatch(
+            documents: jobs.map(\.1),
+            target: snapshot.target,
+            settings: snapshot,
+            cancellation: flag,
+            maxConcurrency: limit,
+            observer: observer
+        )
+
+        // 兜底：并发回调是异步投递的，等它们落地后再收尾。
+        for result in results {
+            recordFinished(result, fileCount: jobs.count)
+        }
+
+        let failures = results.filter { $0.error != nil }.count
+        let lastFolder = results.compactMap(\.outputFolder).last ?? root
+
         finish(
-            finished: finished,
+            finished: results.count,
             failures: failures,
             cancelled: flag.isCancelled,
-            lastFolder: lastFolder ?? root,
+            lastFolder: lastFolder,
             settings: snapshot,
             root: root
         )
+    }
+
+    /// 更新单个文件内部的进度，并合成整体进度。
+    private func recordProgress(documentID: UUID, completed: Int, total: Int, fileCount: Int) {
+        guard let idx = items.firstIndex(where: { $0.id == documentID }) else { return }
+        items[idx].status = .converting(done: completed, total: total)
+        if total > 0 {
+            inFlightProgress[documentID] = Double(completed) / Double(total)
+        }
+        refreshOverallProgress(total: fileCount)
+    }
+
+    /// 一个文件结束时更新状态与整体进度。
+    private func recordFinished(_ result: ConversionResult, fileCount: Int) {
+        inFlightProgress[result.documentID] = nil
+        apply(result, to: result.documentID)
+        refreshOverallProgress(total: fileCount)
+    }
+
+    /// 已完成的文件数 + 进行中的文件内进度，合成为整体进度。
+    private func refreshOverallProgress(total: Int) {
+        guard total > 0 else {
+            overallProgress = 0
+            return
+        }
+        let finishedCount = items.filter { $0.status.isTerminal }.count
+        let partial = inFlightProgress.values.reduce(0, +)
+        overallProgress = min(1, (Double(finishedCount) + partial) / Double(total))
     }
 
     /// 多张图片合并成一个 PDF：全部输入对应同一份输出。

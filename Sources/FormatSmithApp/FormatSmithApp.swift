@@ -53,9 +53,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     weak var model: ConverterModel?
 
     func application(_ application: NSApplication, open urls: [URL]) {
-        DebugLog.log("收到打开文件事件: \(urls.map(\.lastPathComponent))")
+        DebugLog.log("open-document event: \(urls.map(\.lastPathComponent))")
         guard let model else {
-            DebugLog.log("model 尚未就绪，丢弃本次打开事件")
+            DebugLog.log("model not ready yet; dropping the open-document event")
             return
         }
         Task { @MainActor in

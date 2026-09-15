@@ -25,7 +25,11 @@
 "Add at least two PDFs to merge; with one file this just copies it." = "至少需要两个 PDF 才能合并；只有一个文件时等同于复制。";
 "Added %d file(s)." = "已添加 %d 个文件。";
 "All images are merged into a single PDF." = "所有图片会合并成一个 PDF。";
+"All images into one compressed PDF" = "所有图片合并成一个压缩 PDF";
 "All pages" = "全部页面";
+"Applied preset: %@" = "已套用预设：%@";
+"Archive" = "归档";
+"Auto" = "自动";
 "Background" = "背景";
 "Black" = "黑色";
 "Cancel" = "取消";
@@ -48,8 +52,9 @@
 "Convert Now" = "开始转换";
 "Convert documents to PDF first, then to images." = "文档需要先转成 PDF，再转成图片。";
 "Converting %@ to %@ is not supported." = "不支持把 %@ 转换为 %@。";
+"Converting %d file(s), %d at a time…" = "正在转换 %d 个文件，同时处理 %d 个…";
+"Converting %d file(s)…" = "正在转换 %d 个文件…";
 "Converting %d of %d" = "转换中 %d/%d";
-"Converting: %@" = "正在转换：%@";
 "Copy" = "复制";
 "Could not create a drawing context." = "无法创建绘图上下文。";
 "Could not create the PDF context." = "无法创建 PDF 上下文。";
@@ -67,6 +72,7 @@
 "Drop files here, or click “Choose Files” to start." = "拖入文件，或点「选择文件」开始。";
 "Each image" = "单张尺寸";
 "Each page matches its image: 1 pixel = 1 point." = "页面与图片尺寸一致：1 像素 = 1 点。";
+"Email" = "邮件";
 "Everything else works without it." = "其余功能不受影响。";
 "Example name" = "示例文件名";
 "Extract pages" = "提取页面";
@@ -85,6 +91,7 @@
 "Images are scaled to fit and centered on the page." = "图片等比缩放后居中放置。";
 "Install it with Homebrew, or download it from libreoffice.org." = "可以用 Homebrew 安装，也可以从 libreoffice.org 下载。";
 "Install it with Homebrew. Markdown still converts without it, using the built-in renderer." = "可以用 Homebrew 安装；没装时 Markdown 仍会用内置渲染器转换。";
+"JPEG, small enough to attach" = "JPEG，体积适合邮件附件";
 "Join several PDFs into one document." = "把多个 PDF 首尾相接合成一个文档。";
 "Keep only the pages you list." = "只保留你列出的页面。";
 "Lossless" = "无损";
@@ -115,12 +122,17 @@
 "PDF size" = "PDF 体积";
 "PDF tool" = "PDF 工具";
 "PDFs and images. Multiple files are fine, and folders work too." = "支持 PDF 与图片，可多选，也支持整个文件夹。";
+"PNG at 2× — crisp on Retina screens" = "2 倍 PNG，在高分屏上更清晰";
+"PNG at original size, nothing thrown away" = "原始尺寸 PNG，不做任何有损处理";
 "Page ranges apply to PDF input only; images are always exported whole." = "页码范围仅对 PDF 生效，图片始终整张导出。";
 "Pages" = "页面范围";
 "Pages per file" = "每个文件的页数";
+"Parallel files" = "并行文件数";
 "Photographs shrink a lot; images with transparency are kept lossless." = "照片类图片体积可大幅下降；带透明通道的图片保持无损。";
 "Placeholders: {name} {page} {total} {date} {time}" = "可用占位符：{name} {page} {total} {date} {time}";
+"Presets" = "预设";
 "Preview" = "输出预估";
+"Print" = "打印";
 "Quality" = "压缩质量";
 "Rasterise pages at a lower resolution to shrink the file." = "以较低分辨率重新栅格化，换取更小的文件。";
 "Reading…" = "正在读取…";
@@ -131,11 +143,13 @@
 "Resolution" = "输出分辨率";
 "Rotate" = "旋转";
 "Scale" = "倍数";
+"Scanned PDF" = "扫描成 PDF";
 "Show all formats" = "显示全部格式";
 "Show in Finder" = "在访达中显示";
 "Split" = "拆分";
 "Subfolder per source file" = "每个源文件单独建子文件夹";
 "Supports transparency" = "支持透明";
+"TIFF at 300 DPI, lossless" = "300 DPI 无损 TIFF";
 "Text" = "文本";
 "The computed output size is invalid. Lower the resolution." = "计算出的尺寸无效，请降低分辨率。";
 "The converter did not finish in time." = "转换器没有在限定时间内完成。";
@@ -154,6 +168,7 @@
 "Turn every page by a fixed angle." = "把所有页面旋转固定角度。";
 "Unknown" = "未知";
 "Use Desktop" = "恢复默认（桌面）";
+"Web" = "网页";
 "White" = "白色";
 "Write a separate PDF every N pages." = "每 N 页输出一个独立的 PDF。";
 "Zero-pad page numbers (1 → 001)" = "页码补零（1 → 001）";

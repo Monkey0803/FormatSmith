@@ -147,6 +147,64 @@ public enum ConversionEngine {
         }
     }
 
+    // MARK: - 批量
+
+    /// 并发转换一批文件。
+    ///
+    /// 渲染是 CPU 密集的，串行处理一批几十个文件会白白空着多核；
+    /// 这里同时跑 `maxConcurrency` 个，其余排队。
+    ///
+    /// - Returns: 每个输入的结果（顺序不保证，按完成先后返回）。
+    public static func convertBatch(
+        documents: [SourceDocument],
+        target: OutputTarget,
+        settings: ConversionSettings,
+        cancellation: CancellationFlag,
+        maxConcurrency: Int = 4,
+        observer: ConversionObserver = .none
+    ) async -> [ConversionResult] {
+        guard !documents.isEmpty else { return [] }
+        let limit = min(max(1, maxConcurrency), documents.count)
+
+        return await withTaskGroup(of: ConversionResult.self) { group in
+            var nextIndex = 0
+
+            func submitNext() {
+                guard nextIndex < documents.count, !cancellation.isCancelled else { return }
+                let index = nextIndex
+                let document = documents[index]
+                nextIndex += 1
+                group.addTask(priority: .userInitiated) {
+                    convert(
+                        document: document,
+                        target: target,
+                        settings: settings,
+                        cancellation: cancellation,
+                        observer: observer,
+                        fileIndex: index,
+                        fileCount: documents.count
+                    )
+                }
+            }
+
+            for _ in 0..<limit { submitNext() }
+
+            var results: [ConversionResult] = []
+            for await result in group {
+                results.append(result)
+                observer.onFileFinished?(result)
+                submitNext()
+            }
+            return results
+        }
+    }
+
+    /// 自动并发度：按核数，但不超过 4 —— 再多收益很小，内存却按倍数上涨。
+    public static func automaticConcurrency(configured: Int) -> Int {
+        let cores = ProcessInfo.processInfo.activeProcessorCount
+        return configured > 0 ? configured : min(cores, 4)
+    }
+
     // MARK: - 文档 → PDF
 
     /// Office / HTML / Markdown / 纯文本 → PDF。
@@ -165,7 +223,13 @@ public enum ConversionEngine {
             if cancellation.isCancelled { throw ConversionError(Localized.text("Cancelled.")) }
 
             observer.onProgress?(
-                ConversionProgress(completedUnits: 0, totalUnits: 1, fileIndex: fileIndex, fileCount: fileCount)
+                ConversionProgress(
+                    completedUnits: 0,
+                    totalUnits: 1,
+                    fileIndex: fileIndex,
+                    fileCount: fileCount,
+                    documentID: document.id
+                )
             )
 
             let target = try outputFolder(for: document, settings: settings)
@@ -178,7 +242,13 @@ public enum ConversionEngine {
             )
 
             observer.onProgress?(
-                ConversionProgress(completedUnits: 1, totalUnits: 1, fileIndex: fileIndex, fileCount: fileCount)
+                ConversionProgress(
+                    completedUnits: 1,
+                    totalUnits: 1,
+                    fileIndex: fileIndex,
+                    fileCount: fileCount,
+                    documentID: document.id
+                )
             )
 
             return ConversionResult(
@@ -379,7 +449,13 @@ public enum ConversionEngine {
             if cancellation.isCancelled { throw ConversionError(Localized.text("Cancelled.")) }
 
             observer.onProgress?(
-                ConversionProgress(completedUnits: 0, totalUnits: 1, fileIndex: fileIndex, fileCount: fileCount)
+                ConversionProgress(
+                    completedUnits: 0,
+                    totalUnits: 1,
+                    fileIndex: fileIndex,
+                    fileCount: fileCount,
+                    documentID: document.id
+                )
             )
 
             let decoded = try ImageDecoder.decode(
@@ -408,7 +484,13 @@ public enum ConversionEngine {
             written.append(url)
 
             observer.onProgress?(
-                ConversionProgress(completedUnits: 1, totalUnits: 1, fileIndex: fileIndex, fileCount: fileCount)
+                ConversionProgress(
+                    completedUnits: 1,
+                    totalUnits: 1,
+                    fileIndex: fileIndex,
+                    fileCount: fileCount,
+                    documentID: document.id
+                )
             )
 
             return ConversionResult(
@@ -464,7 +546,8 @@ public enum ConversionEngine {
                         completedUnits: offset + 1,
                         totalUnits: documents.count,
                         fileIndex: fileIndex,
-                        fileCount: fileCount
+                        fileCount: fileCount,
+                        documentID: document.id
                     )
                 )
             }
@@ -560,7 +643,8 @@ public enum ConversionEngine {
                         completedUnits: offset + 1,
                         totalUnits: pages.count,
                         fileIndex: fileIndex,
-                        fileCount: fileCount
+                        fileCount: fileCount,
+                        documentID: document.id
                     )
                 )
             }

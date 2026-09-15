@@ -82,6 +82,8 @@ public struct ConversionResult: Sendable {
 
 /// 转换进度回调。所有回调都在工作线程被调用，调用方负责切回主线程。
 public struct ConversionProgress: Sendable {
+    /// 这条进度属于哪个输入。并发转换时用它区分来源。
+    public let documentID: UUID?
     /// 当前文件已完成的页数 / 张数。
     public let completedUnits: Int
     /// 当前文件的总页数 / 张数。
@@ -97,7 +99,14 @@ public struct ConversionProgress: Sendable {
         return min(1, Double(fileIndex) * perFile + within * perFile)
     }
 
-    public init(completedUnits: Int, totalUnits: Int, fileIndex: Int, fileCount: Int) {
+    public init(
+        completedUnits: Int,
+        totalUnits: Int,
+        fileIndex: Int,
+        fileCount: Int,
+        documentID: UUID? = nil
+    ) {
+        self.documentID = documentID
         self.completedUnits = completedUnits
         self.totalUnits = totalUnits
         self.fileIndex = fileIndex

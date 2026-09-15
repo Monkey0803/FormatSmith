@@ -9,6 +9,7 @@ struct ConversionSettingsPanel: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+                presetSection
                 targetSection
                 if !model.missingRequiredTools.isEmpty {
                     dependencySection
@@ -47,6 +48,48 @@ struct ConversionSettingsPanel: View {
             options.insert(current, at: 0)
         }
         return options
+    }
+
+    // MARK: 预设
+
+    private var presetSection: some View {
+        SettingsCard(title: Localized.text("Presets"), systemImage: "wand.and.stars") {
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 96), spacing: 6)],
+                spacing: 6
+            ) {
+                ForEach(PresetLibrary.all) { preset in
+                    let selected = model.matches(preset)
+                    Button {
+                        model.apply(preset)
+                    } label: {
+                        VStack(spacing: 3) {
+                            Image(systemName: preset.systemImage)
+                                .font(.system(size: 13))
+                            Text(preset.name)
+                                .font(.system(size: 11, weight: .medium))
+                                .lineLimit(1)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                    }
+                    .buttonStyle(.plain)
+                    .background(
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .fill(selected ? Color.accentColor.opacity(0.85) : Color.secondary.opacity(0.12))
+                    )
+                    .foregroundStyle(selected ? Color.white : Color.primary)
+                    .help(preset.detail)
+                }
+            }
+
+            if let description = PresetLibrary.all.first(where: { model.matches($0) })?.detail {
+                Text(description)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 
     // MARK: 输出目标
@@ -599,6 +642,29 @@ struct ConversionSettingsPanel: View {
                 )
             )
             .font(.system(size: 12))
+
+            if model.convertibleItems.count > 1 {
+                HStack(spacing: 8) {
+                    Text(Localized.text("Parallel files"))
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                    Picker(
+                        "",
+                        selection: Binding(
+                            get: { model.settings.maxConcurrentFiles },
+                            set: { model.settings.maxConcurrentFiles = $0 }
+                        )
+                    ) {
+                        Text(Localized.text("Auto")).tag(0)
+                        Text("1").tag(1)
+                        Text("2").tag(2)
+                        Text("4").tag(4)
+                        Text("8").tag(8)
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                }
+            }
         }
     }
 

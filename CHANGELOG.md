@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Presets: Web (2× PNG), Email, Print (300 DPI TIFF), Archive, and Scanned PDF, each setting format,
+  resolution, quality and background in one click.
+- Parallel conversion: `ConversionEngine.convertBatch` runs several files at once, capped at 4 by
+  default and configurable in the app or per batch. Progress events now carry the document they
+  belong to, so concurrent runs report accurately.
+- The CLI uses the same batch engine, so `--convert` with many files is no longer serial.
+
 - Document → PDF: Office, OpenDocument and RTF via a locally installed LibreOffice (run headless with
   a private profile so it never collides with the copy you have open); HTML, Markdown and plain text
   via WebKit with no extra dependency. Markdown prefers pandoc and falls back to a built-in renderer.
@@ -66,6 +73,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Long HTML and Markdown documents no longer collapse into a single page thousands of points tall.
   `WKWebView.pdf(configuration:)` does not paginate, so the converter measures block positions and
   slices the content into A4 pages itself.
+
+### Changed
+
+- Conversion failures show their full message in the queue (wrapped over two lines and available as a
+  tooltip) instead of being cut off.
 
 ### Removed
 

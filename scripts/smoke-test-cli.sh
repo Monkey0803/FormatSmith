@@ -153,6 +153,22 @@ expect_exit 0 $? "one PDF per image when merging is off"
 expect_file "$OUT/sample-1.pdf" "first separate PDF"
 expect_file "$OUT/sample-2.pdf" "second separate PDF"
 
+echo "▶ Batch conversion (parallel path)…"
+BATCH="$WORK/batch"
+mkdir -p "$BATCH/in"
+for i in 1 2 3 4 5; do
+    swift "$ROOT/scripts/make-sample-pdf.swift" "$BATCH/in/doc$i.pdf" 2 >/dev/null
+done
+"$BIN" --convert "$BATCH/in/doc1.pdf" "$BATCH/in/doc2.pdf" "$BATCH/in/doc3.pdf" \
+    "$BATCH/in/doc4.pdf" "$BATCH/in/doc5.pdf" --to png --dpi 72 --out "$BATCH/out" >/dev/null 2>&1
+expect_exit 0 $? "batch conversion"
+BATCH_COUNT="$(ls "$BATCH/out" | wc -l | tr -d ' ')"
+if [ "$BATCH_COUNT" = "10" ]; then
+    pass "all 5 files × 2 pages produced (10 files)"
+else
+    fail "batch output count: expected 10, got $BATCH_COUNT"
+fi
+
 echo "▶ PDF toolbox…"
 TOOLS="$WORK/tools"
 mkdir -p "$TOOLS"

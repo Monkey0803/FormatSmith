@@ -18,8 +18,12 @@ in the app itself.
 - **Page ranges**: all pages, or something like `1-3,5,8-10`.
 - **Naming you control**: `{name}`, `{page}`, `{total}`, `{date}`, `{time}`, per-file subfolders,
   zero-padded page numbers. Existing files are never overwritten.
+- **Presets** for the common jobs: Web (2× PNG), Email, Print (300 DPI TIFF), Archive, and
+  Scanned PDF. One click sets format, resolution, quality and background together.
 - **Honest feedback**: per-file progress, a running total, cancel at any time, and "Show in Finder"
-  when a file is done.
+  when a file is done. Failures keep their full explanation instead of a truncated one-liner.
+- **Parallel conversion**: several files convert at once (up to 4 by default, configurable), because
+  rendering is CPU-bound and serial batches leave most cores idle.
 - **Images → PDF**: one PDF per image, or merge a whole selection into a single multi-page document,
   with a page size that either matches the image or fits A4/Letter with a margin. Embed losslessly, or
   JPEG-compress the images to keep the file small.

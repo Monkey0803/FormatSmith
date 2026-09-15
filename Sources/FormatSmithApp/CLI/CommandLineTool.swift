@@ -249,32 +249,41 @@ enum CommandLineTool {
         settings: ConversionSettings,
         cancellation: CancellationFlag
     ) -> Int {
+        // 走和界面同一套并发实现：这样冒烟测试才能真正覆盖到批量转换路径，
+        // 顺带让「一次转几十个文件」在命令行里也快起来。
+        let limit = ConversionEngine.automaticConcurrency(configured: settings.maxConcurrentFiles)
+        let printer = ProgressPrinter(fileName: "\(documents.count) file(s)")
+
+        let results: [ConversionResult]
+        do {
+            results = try MainThreadBridge.await {
+                await ConversionEngine.convertBatch(
+                    documents: documents,
+                    target: settings.target,
+                    settings: settings,
+                    cancellation: cancellation,
+                    maxConcurrency: limit,
+                    observer: ConversionObserver(onProgress: { printer.report($0) })
+                )
+            }
+        } catch {
+            FileHandle.standardError.write("✗ \(error.localizedDescription)\n".data(using: .utf8)!)
+            return documents.count
+        }
+
         var failures = 0
-
-        for (index, document) in documents.enumerated() {
-            let printer = ProgressPrinter(fileName: document.url.lastPathComponent)
-            let observer = ConversionObserver(onProgress: { printer.report($0) })
-
-            let result = ConversionEngine.convert(
-                document: document,
-                target: settings.target,
-                settings: settings,
-                cancellation: cancellation,
-                observer: observer,
-                fileIndex: index,
-                fileCount: documents.count
-            )
-
+        for result in results {
+            let document = documents.first { $0.id == result.documentID }
+            let name = document?.url.lastPathComponent ?? result.documentID.uuidString
             if let error = result.error {
-                FileHandle.standardError.write(
-                    "✗ \(document.url.lastPathComponent): \(error.message)\n".data(using: .utf8)!)
+                FileHandle.standardError.write("✗ \(name): \(error.message)\n".data(using: .utf8)!)
                 failures += 1
             } else if result.outputFiles.count == 1, let output = result.outputFiles.first {
-                // 单文件输出（提取、旋转、压缩、图片转 PDF）报文件本身，别报「1 个文件」
-                print("✓ \(document.url.lastPathComponent) → \(output.path)")
+                // 单文件输出（提取、旋转、压缩、文档转 PDF）报文件本身
+                print("✓ \(name) → \(output.path)")
             } else {
                 let folder = result.outputFolder?.path ?? settings.resolvedOutputDirectory.path
-                print("✓ \(document.url.lastPathComponent) → \(result.producedCount) file(s)  \(folder)")
+                print("✓ \(name) → \(result.producedCount) file(s)  \(folder)")
             }
         }
         return failures
@@ -422,21 +431,30 @@ enum CommandLineTool {
     /// 做成引用类型而不是捕获局部变量，是为了不触发
     /// 「在并发执行代码中引用/修改被捕获的 var」这类 Swift 6 会变成错误的写法。
     private final class ProgressPrinter: @unchecked Sendable {
-        private let fileName: String
-        private var lastReported = -1
+        private let label: String
+        private let lock = NSLock()
+        private var lastReported: [UUID: Int] = [:]
 
         init(fileName: String) {
-            self.fileName = fileName
+            label = fileName
         }
 
         func report(_ progress: ConversionProgress) {
-            guard progress.completedUnits != lastReported else { return }
-            lastReported = progress.completedUnits
+            let key = progress.documentID ?? UUID()
             let unit = progress.completedUnits
             let total = progress.totalUnits
-            guard unit > 0 else { return }
-            guard unit == 1 || unit == total || unit % 10 == 0 else { return }
-            print("  … \(fileName) \(unit)/\(total)")
+            guard unit > 0, unit == 1 || unit == total || unit % 10 == 0 else { return }
+
+            lock.lock()
+            let previous = lastReported[key]
+            guard previous != unit else {
+                lock.unlock()
+                return
+            }
+            lastReported[key] = unit
+            lock.unlock()
+
+            print("  … \(label) \(unit)/\(total)")
         }
     }
 }

@@ -151,8 +151,9 @@ struct QueueRowView: View {
                     .truncationMode(.middle)
                 Text(subtitle)
                     .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .foregroundStyle(failureMessage == nil ? Color.secondary : Color.orange)
+                    .lineLimit(2)
+                    .help(failureMessage ?? subtitle)
             }
             Spacer(minLength: 6)
             statusBadge
@@ -197,6 +198,12 @@ struct QueueRowView: View {
             RoundedRectangle(cornerRadius: 6, style: .continuous)
                 .strokeBorder(Color.secondary.opacity(0.2), lineWidth: 1)
         )
+    }
+
+    /// 失败时把完整原因挂出来，供 tooltip 与颜色使用。
+    private var failureMessage: String? {
+        if case let .failed(message) = item.status { return message }
+        return nil
     }
 
     private var subtitle: String {
