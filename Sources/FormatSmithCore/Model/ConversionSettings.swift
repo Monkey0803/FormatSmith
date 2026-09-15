@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 
 /// 输出分辨率的表达方式。
@@ -34,6 +35,33 @@ public enum ImageBackground: String, Codable, CaseIterable, Identifiable, Sendab
     }
 }
 
+/// 图片转 PDF 时的页面尺寸策略。
+public enum PDFPageSize: String, Codable, CaseIterable, Identifiable, Sendable {
+    /// 页面尺寸等于图片尺寸（1 px = 1 pt）。
+    case fitImage
+    case a4
+    case letter
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .fitImage: return Localized.text("Match image")
+        case .a4: return "A4"
+        case .letter: return "Letter"
+        }
+    }
+
+    /// 固定页面尺寸（点）；`.fitImage` 返回 nil，表示由图片决定。
+    public var pointSize: CGSize? {
+        switch self {
+        case .fitImage: return nil
+        case .a4: return CGSize(width: 595.28, height: 841.89)
+        case .letter: return CGSize(width: 612, height: 792)
+        }
+    }
+}
+
 /// 页码范围选择方式。
 public enum PageRangeMode: String, Codable, CaseIterable, Identifiable, Sendable {
     case all
@@ -52,8 +80,11 @@ public enum PageRangeMode: String, Codable, CaseIterable, Identifiable, Sendable
 /// 一次转换的全部参数。Codable，直接用于持久化。
 public struct ConversionSettings: Codable, Equatable, Sendable {
 
-    // 输出格式
+    // 输出目标
+    /// 图片格式选择。切到 PDF 时这个值会保留，切回来还是原来那个格式。
     public var format: ImageFormat = .png
+    /// 输出是否为 PDF。
+    public var producesPDF: Bool = false
     /// 有损格式的压缩质量，0.05–1.0。
     public var quality: Double = 0.9
 
@@ -83,9 +114,43 @@ public struct ConversionSettings: Codable, Equatable, Sendable {
     /// 并发转换的文件数上限。0 表示自动（`min(核数, 4)`）。
     public var maxConcurrentFiles: Int = 0
 
+    // 图片 → PDF
+    /// 多张图片是否合并成一个多页 PDF。
+    public var mergeImagesIntoOnePDF: Bool = true
+    public var pdfPageSize: PDFPageSize = .fitImage
+    /// 页边距（点），仅在固定页面尺寸下生效。
+    public var pdfMargin: Double = 24
+    /// 是否对嵌入 PDF 的图片做有损压缩；默认保留原始画质。
+    public var pdfCompressesImages: Bool = false
+    public var pdfImageQuality: Double = 0.85
+
     public init() {}
 
     // MARK: - 派生值
+
+    /// 当前目标。
+    public var target: OutputTarget {
+        get { producesPDF ? .pdf : .image(format) }
+        set {
+            switch newValue {
+            case .pdf:
+                producesPDF = true
+            case let .image(newFormat):
+                producesPDF = false
+                format = newFormat
+            }
+        }
+    }
+
+    /// 图片输入使用的缩放系数。
+    ///
+    /// DPI 对图片没有天然含义，这里沿用 PDF 的约定：72 DPI 即原始像素尺寸。
+    public var imageScale: Double {
+        switch resolutionMode {
+        case .scale: return max(0.05, scale)
+        case .dpi: return max(0.05, dpi / 72.0)
+        }
+    }
 
     /// 渲染时使用的缩放系数（相对 PDF 的 72pt/inch）。
     public var effectiveScale: Double {

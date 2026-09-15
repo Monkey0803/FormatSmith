@@ -48,7 +48,10 @@ public struct SourceDocument: Identifiable, Sendable, Equatable {
 
 /// 单个文件的转换结果。
 public struct ConversionResult: Sendable {
+    /// 主要输入（合并输出时是第一个输入）。
     public let documentID: UUID
+    /// 合并成一份输出时，参与的全部输入。
+    public var includedDocumentIDs: [UUID] = []
     public let outputFiles: [URL]
     public let outputFolder: URL?
     /// 实际写出的张数 / 页数。
@@ -64,7 +67,8 @@ public struct ConversionResult: Sendable {
         outputFolder: URL? = nil,
         producedCount: Int = 0,
         error: ConversionError? = nil,
-        duration: TimeInterval = 0
+        duration: TimeInterval = 0,
+        includedDocumentIDs: [UUID] = []
     ) {
         self.documentID = documentID
         self.outputFiles = outputFiles
@@ -72,6 +76,7 @@ public struct ConversionResult: Sendable {
         self.producedCount = producedCount
         self.error = error
         self.duration = duration
+        self.includedDocumentIDs = includedDocumentIDs.isEmpty ? [documentID] : includedDocumentIDs
     }
 }
 

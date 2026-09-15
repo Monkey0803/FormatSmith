@@ -63,6 +63,219 @@ public enum ConversionEngine {
         return folder
     }
 
+    // MARK: - 统一入口
+
+    /// 按输入类型与目标路由到对应管线。
+    ///
+    /// 这里是「一个转换器」和「一堆转换脚本」的区别：调用方不需要知道
+    /// 手里的东西是 PDF 还是图片，只需要说清楚要什么。
+    public static func convert(
+        document: SourceDocument,
+        target: OutputTarget,
+        settings: ConversionSettings,
+        cancellation: CancellationFlag,
+        observer: ConversionObserver = .none,
+        fileIndex: Int = 0,
+        fileCount: Int = 1
+    ) -> ConversionResult {
+        let plan = ConversionRouter.plan(input: document.kind, target: target)
+
+        if let reason = plan.unavailableReason {
+            return ConversionResult(
+                documentID: document.id,
+                error: ConversionError(reason)
+            )
+        }
+
+        switch plan.kind {
+        case .pdfPagesToImages:
+            return convertPDFToImages(
+                document: document,
+                settings: settings,
+                cancellation: cancellation,
+                observer: observer,
+                fileIndex: fileIndex,
+                fileCount: fileCount
+            )
+
+        case .imagesToImages:
+            return convertImageToImage(
+                document: document,
+                settings: settings,
+                cancellation: cancellation,
+                observer: observer,
+                fileIndex: fileIndex,
+                fileCount: fileCount
+            )
+
+        case .imageToPDF:
+            return composePDF(
+                documents: [document],
+                settings: settings,
+                cancellation: cancellation,
+                observer: observer,
+                fileIndex: fileIndex,
+                fileCount: fileCount
+            )
+
+        case .documentToPDF, .pdfToolbox, .imagesToOnePDF:
+            return ConversionResult(
+                documentID: document.id,
+                error: ConversionError(plan.unavailableReason ?? Localized.text("Not available in this build yet."))
+            )
+        }
+    }
+
+    // MARK: - 图片 → 图片
+
+    /// 解码、按需缩放，再按目标格式重新编码。
+    public static func convertImageToImage(
+        document: SourceDocument,
+        settings: ConversionSettings,
+        cancellation: CancellationFlag,
+        observer: ConversionObserver = .none,
+        fileIndex: Int = 0,
+        fileCount: Int = 1
+    ) -> ConversionResult {
+        let started = Date()
+        var written: [URL] = []
+        var folder: URL?
+
+        do {
+            if cancellation.isCancelled { throw ConversionError(Localized.text("Cancelled.")) }
+
+            observer.onProgress?(
+                ConversionProgress(completedUnits: 0, totalUnits: 1, fileIndex: fileIndex, fileCount: fileCount)
+            )
+
+            let decoded = try ImageDecoder.decode(
+                url: document.url,
+                scale: settings.imageScale,
+                maxPixels: settings.maxPixels
+            )
+            // 目标格式存不了透明通道时先铺底，避免透明区域变黑。
+            let prepared = try ImageEncoder.prepare(
+                decoded,
+                for: settings.format,
+                background: settings.background
+            )
+
+            let target = try outputFolder(for: document, settings: settings)
+            folder = target
+
+            let fileName = OutputNaming.fileName(
+                for: document.displayName, page: nil, pageCount: nil, settings: settings)
+            let url = try ImageEncoder.write(
+                prepared,
+                format: settings.format,
+                quality: settings.quality,
+                to: target.appendingPathComponent(fileName)
+            )
+            written.append(url)
+
+            observer.onProgress?(
+                ConversionProgress(completedUnits: 1, totalUnits: 1, fileIndex: fileIndex, fileCount: fileCount)
+            )
+
+            return ConversionResult(
+                documentID: document.id,
+                outputFiles: written,
+                outputFolder: folder,
+                producedCount: written.count,
+                duration: Date().timeIntervalSince(started)
+            )
+        } catch {
+            return ConversionResult(
+                documentID: document.id,
+                outputFiles: written,
+                outputFolder: folder,
+                producedCount: written.count,
+                error: Self.conversionError(from: error),
+                duration: Date().timeIntervalSince(started)
+            )
+        }
+    }
+
+    // MARK: - 图片 → PDF
+
+    /// 把一张或多张图片写成一个 PDF。传多张即为合并。
+    public static func composePDF(
+        documents: [SourceDocument],
+        settings: ConversionSettings,
+        cancellation: CancellationFlag,
+        observer: ConversionObserver = .none,
+        fileIndex: Int = 0,
+        fileCount: Int = 1
+    ) -> ConversionResult {
+        let started = Date()
+        let primaryID = documents.first?.id ?? UUID()
+        let ids = documents.map(\.id)
+
+        guard let first = documents.first else {
+            return ConversionResult(
+                documentID: primaryID, error: ConversionError(Localized.text("There is nothing to convert.")))
+        }
+
+        do {
+            var pages: [PDFComposer.Page] = []
+            for (offset, document) in documents.enumerated() {
+                if cancellation.isCancelled { throw ConversionError(Localized.text("Cancelled.")) }
+                let image = try ImageDecoder.decode(
+                    url: document.url, scale: settings.imageScale, maxPixels: settings.maxPixels)
+                pages.append(PDFComposer.Page(image: image))
+                observer.onProgress?(
+                    ConversionProgress(
+                        completedUnits: offset + 1,
+                        totalUnits: documents.count,
+                        fileIndex: fileIndex,
+                        fileCount: fileCount
+                    )
+                )
+            }
+
+            let folder = try outputFolder(for: first, settings: settings)
+            let fileName = outputNamingForPDF(
+                documents: documents,
+                settings: settings
+            )
+            let url = try PDFComposer.compose(
+                pages: pages,
+                settings: settings,
+                to: folder.appendingPathComponent(fileName),
+                cancellation: cancellation
+            )
+
+            return ConversionResult(
+                documentID: primaryID,
+                outputFiles: [url],
+                outputFolder: folder,
+                producedCount: pages.count,
+                duration: Date().timeIntervalSince(started),
+                includedDocumentIDs: ids
+            )
+        } catch {
+            return ConversionResult(
+                documentID: primaryID,
+                error: Self.conversionError(from: error),
+                duration: Date().timeIntervalSince(started),
+                includedDocumentIDs: ids
+            )
+        }
+    }
+
+    /// 输出 PDF 的文件名：沿用同一套模板，`{page}` 在单文件输出下会被去掉。
+    /// 合并多张时把总张数写进 `{total}`。
+    static func outputNamingForPDF(documents: [SourceDocument], settings: ConversionSettings) -> String {
+        let base = OutputNaming.expand(
+            pattern: settings.filenamePattern,
+            documentName: documents.first?.displayName ?? "output",
+            page: nil,
+            pageCount: documents.count,
+            padsPageNumbers: settings.padsPageNumbers
+        )
+        return "\(base).pdf"
+    }
+
     // MARK: - PDF → 图片
 
     /// 把一个 PDF 的选定页面导出为图片序列。

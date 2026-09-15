@@ -2,18 +2,25 @@ import AppKit
 import FormatSmithCore
 import SwiftUI
 
-/// 右侧设置面板。
+/// 右侧设置面板。内容随「输出目标」变化：选图片格式时给图片参数，选 PDF 时给版面参数。
 struct ConversionSettingsPanel: View {
     @EnvironmentObject private var model: ConverterModel
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                formatSection
-                qualitySection
-                resolutionSection
-                backgroundSection
-                pageRangeSection
+                targetSection
+                if model.target.isPDF {
+                    pdfLayoutSection
+                    pdfCompressionSection
+                } else {
+                    qualitySection
+                    resolutionSection
+                    backgroundSection
+                }
+                if model.hasPDFInputs, !model.target.isPDF {
+                    pageRangeSection
+                }
                 outputSection
                 previewSection
             }
@@ -25,64 +32,83 @@ struct ConversionSettingsPanel: View {
         .disabled(model.isConverting)
     }
 
-    /// 当前可选格式；若已选格式不在精选列表里（例如上次选了长尾格式），补进去避免选择器空白。
+    /// 当前可选格式；若已选格式不在当前列表里（例如上次选了长尾格式），补进去避免选择器空白。
     private var formatOptions: [ImageFormat] {
         var options = model.availableFormats
-        if !options.contains(model.settings.format) {
-            options.insert(model.settings.format, at: 0)
+        if let current = model.target.imageFormat, !options.contains(current) {
+            options.insert(current, at: 0)
         }
         return options
     }
 
-    // MARK: 格式
+    // MARK: 输出目标
 
-    private var formatSection: some View {
-        SettingsCard(title: Localized.text("Image format"), systemImage: "photo.on.rectangle.angled") {
+    private var targetSection: some View {
+        SettingsCard(title: Localized.text("Output format"), systemImage: "arrow.right.doc.on.clipboard") {
             Picker(
                 "",
                 selection: Binding(
-                    get: { model.settings.format },
-                    set: { newValue in
-                        model.settings.format = newValue
-                        model.settings.normalizeForFormat()
-                    }
+                    get: { model.target },
+                    set: { model.target = $0 }
                 )
             ) {
-                ForEach(formatOptions) { format in
-                    Text(format.menuLabel).tag(format)
+                SwiftUI.Section(Localized.text("Images")) {
+                    ForEach(formatOptions) { format in
+                        Text(format.menuLabel).tag(OutputTarget.image(format))
+                    }
+                }
+                SwiftUI.Section(Localized.text("Documents")) {
+                    Text("PDF").tag(OutputTarget.pdf)
                 }
             }
             .labelsHidden()
             .pickerStyle(.menu)
 
-            Text(model.settings.format.summary)
+            Text(targetSummary)
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
-
-            Toggle(
-                Localized.text("Show all formats"),
-                isOn: Binding(
-                    get: { model.showsAllFormats },
-                    set: { model.showsAllFormats = $0 }
-                )
-            )
-            .font(.system(size: 11))
-            .toggleStyle(.checkbox)
-
-            if let readOnly = FormatRegistry.readOnlyNotable.first {
-                Text(
-                    Localized.text(
-                        "%@ can be opened but not written by macOS, so it is not offered as an output.",
-                        readOnly.displayName)
-                )
-                .font(.system(size: 10))
-                .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
+
+            if !model.target.isPDF {
+                Toggle(
+                    Localized.text("Show all formats"),
+                    isOn: Binding(
+                        get: { model.showsAllFormats },
+                        set: { model.showsAllFormats = $0 }
+                    )
+                )
+                .font(.system(size: 11))
+                .toggleStyle(.checkbox)
+            }
+
+            if let reason = model.unavailableReasons.first {
+                Label(reason, systemImage: "exclamationmark.triangle.fill")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
 
+    private var targetSummary: String {
+        if model.target.isPDF {
+            if model.hasImageInputs, model.settings.mergeImagesIntoOnePDF, model.convertibleItems.count > 1 {
+                return Localized.text("All images are merged into a single PDF.")
+            }
+            return Localized.text("One PDF per source file.")
+        }
+        return model.target.imageFormat?.summary ?? ""
+    }
+
     // MARK: 画质
+
+    private var currentFormatSupportsQuality: Bool {
+        model.target.imageFormat?.supportsQuality ?? false
+    }
+
+    private var currentFormatSupportsAlpha: Bool {
+        model.target.imageFormat?.supportsAlpha ?? false
+    }
 
     private var qualitySection: some View {
         SettingsCard(title: Localized.text("Quality"), systemImage: "dial.medium") {
@@ -94,21 +120,17 @@ struct ConversionSettingsPanel: View {
                     ),
                     in: 0.1...1.0
                 )
-                .disabled(!model.settings.format.supportsQuality)
+                .disabled(!currentFormatSupportsQuality)
 
                 Text("\(Int((model.settings.quality * 100).rounded()))%")
                     .font(.system(size: 12, weight: .medium).monospacedDigit())
                     .frame(width: 42, alignment: .trailing)
-                    .foregroundStyle(model.settings.format.supportsQuality ? .primary : .tertiary)
+                    .foregroundStyle(currentFormatSupportsQuality ? .primary : .tertiary)
             }
-            if !model.settings.format.supportsQuality {
-                Text(
-                    Localized.text(
-                        "%@ is lossless, so the quality setting does not apply.",
-                        model.settings.format.displayName)
-                )
-                .font(.system(size: 11))
-                .foregroundStyle(.tertiary)
+            if !currentFormatSupportsQuality, let format = model.target.imageFormat {
+                Text(Localized.text("%@ is lossless, so the quality setting does not apply.", format.displayName))
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
             }
         }
     }
@@ -151,16 +173,20 @@ struct ConversionSettingsPanel: View {
                     )
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 76)
-                    Text(Localized.text("72–150 screen · 300 print · 600 archival"))
-                        .font(.system(size: 10))
-                        .foregroundStyle(.tertiary)
-                        .lineLimit(1)
+                    Text(
+                        model.hasPDFInputs
+                            ? Localized.text("72–150 screen · 300 print · 600 archival")
+                            : Localized.text("For images, 72 DPI means the original pixel size.")
+                    )
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(2)
                 }
             } else {
                 PresetChipRow(
-                    values: [1, 2, 3, 4],
+                    values: [0.5, 1, 2, 3, 4],
                     selected: model.settings.scale,
-                    label: { "\(Int($0))×" }
+                    label: { $0 < 1 ? "\(Int($0 * 100))%" : "\(Int($0))×" }
                 ) { model.settings.scale = $0 }
             }
         }
@@ -183,16 +209,12 @@ struct ConversionSettingsPanel: View {
             }
             .labelsHidden()
             .pickerStyle(.segmented)
-            .disabled(!model.settings.format.supportsAlpha)
+            .disabled(!currentFormatSupportsAlpha)
 
-            if !model.settings.format.supportsAlpha {
-                Text(
-                    Localized.text(
-                        "%@ cannot store transparency, so a solid background is used.",
-                        model.settings.format.displayName)
-                )
-                .font(.system(size: 11))
-                .foregroundStyle(.tertiary)
+            if !currentFormatSupportsAlpha, let format = model.target.imageFormat {
+                Text(Localized.text("%@ cannot store transparency, so a solid background is used.", format.displayName))
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
             }
         }
     }
@@ -234,6 +256,109 @@ struct ConversionSettingsPanel: View {
                         .font(.system(size: 11))
                         .foregroundStyle(.tertiary)
                 }
+            }
+
+            if model.hasImageInputs {
+                Text(Localized.text("Page ranges apply to PDF input only; images are always exported whole."))
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    // MARK: PDF 版面
+
+    private var pdfLayoutSection: some View {
+        SettingsCard(title: Localized.text("PDF page"), systemImage: "doc.plaintext") {
+            if model.hasImageInputs, model.convertibleItems.count > 1 {
+                Toggle(
+                    Localized.text("Merge all images into one PDF"),
+                    isOn: Binding(
+                        get: { model.settings.mergeImagesIntoOnePDF },
+                        set: { model.settings.mergeImagesIntoOnePDF = $0 }
+                    )
+                )
+                .font(.system(size: 12))
+            }
+
+            Picker(
+                "",
+                selection: Binding(
+                    get: { model.settings.pdfPageSize },
+                    set: { model.settings.pdfPageSize = $0 }
+                )
+            ) {
+                ForEach(PDFPageSize.allCases) { size in
+                    Text(size.displayName).tag(size)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.segmented)
+
+            if model.settings.pdfPageSize == .fitImage {
+                Text(Localized.text("Each page matches its image: 1 pixel = 1 point."))
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+            } else {
+                HStack(spacing: 8) {
+                    Text(Localized.text("Margin"))
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                    TextField(
+                        "",
+                        value: Binding(
+                            get: { model.settings.pdfMargin },
+                            set: { model.settings.pdfMargin = min(max($0, 0), 200) }
+                        ), format: .number
+                    )
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 64)
+                    Text(Localized.text("points"))
+                        .font(.system(size: 11))
+                        .foregroundStyle(.tertiary)
+                    Spacer()
+                }
+                Text(Localized.text("Images are scaled to fit and centered on the page."))
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+            }
+        }
+    }
+
+    private var pdfCompressionSection: some View {
+        SettingsCard(title: Localized.text("PDF size"), systemImage: "arrow.down.circle") {
+            Toggle(
+                Localized.text("Compress embedded images (JPEG)"),
+                isOn: Binding(
+                    get: { model.settings.pdfCompressesImages },
+                    set: { model.settings.pdfCompressesImages = $0 }
+                )
+            )
+            .font(.system(size: 12))
+
+            if model.settings.pdfCompressesImages {
+                HStack(spacing: 8) {
+                    Slider(
+                        value: Binding(
+                            get: { model.settings.pdfImageQuality },
+                            set: { model.settings.pdfImageQuality = $0 }
+                        ),
+                        in: 0.2...1.0
+                    )
+                    Text("\(Int((model.settings.pdfImageQuality * 100).rounded()))%")
+                        .font(.system(size: 12, weight: .medium).monospacedDigit())
+                        .frame(width: 42, alignment: .trailing)
+                }
+                Text(Localized.text("Photographs shrink a lot; images with transparency are kept lossless."))
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                Text(Localized.text("Images are embedded losslessly, so the PDF can be large."))
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -293,14 +418,16 @@ struct ConversionSettingsPanel: View {
                 .font(.system(size: 11))
                 .foregroundStyle(.tertiary)
 
-            Toggle(
-                Localized.text("Zero-pad page numbers (1 → 001)"),
-                isOn: Binding(
-                    get: { model.settings.padsPageNumbers },
-                    set: { model.settings.padsPageNumbers = $0 }
+            if !model.target.isPDF {
+                Toggle(
+                    Localized.text("Zero-pad page numbers (1 → 001)"),
+                    isOn: Binding(
+                        get: { model.settings.padsPageNumbers },
+                        set: { model.settings.padsPageNumbers = $0 }
+                    )
                 )
-            )
-            .font(.system(size: 12))
+                .font(.system(size: 12))
+            }
 
             Toggle(
                 Localized.text("Open output folder when finished"),
@@ -318,35 +445,35 @@ struct ConversionSettingsPanel: View {
     private var previewSection: some View {
         SettingsCard(title: Localized.text("Preview"), systemImage: "eye") {
             if let first = model.items.first(where: { $0.document.size.width > 0 }) {
-                let size = first.document.size
-                let scale = model.settings.effectiveScale
-                let width = Int((size.width * scale).rounded())
-                let height = Int((size.height * scale).rounded())
-                let pages = model.settings.pages(outOf: first.document.pageCount).count
-
                 VStack(alignment: .leading, spacing: 5) {
-                    previewRow(Localized.text("Each image"), "\(width) × \(height) px")
-                    previewRow(
-                        Localized.text("First file"),
-                        Localized.text("%d image(s) · %@", pages, model.settings.format.displayName)
-                    )
-                    previewRow(
-                        Localized.text("Example name"),
-                        OutputNaming.fileName(
-                            for: first.name,
-                            page: 1,
-                            pageCount: max(first.document.pageCount, 1),
-                            settings: model.settings
-                        ),
-                        monospaced: true
-                    )
-                    if Double(width * height) > Double(model.settings.maxPixels) {
-                        Label(
-                            Localized.text("This resolution is over the safety limit and will be rejected."),
-                            systemImage: "exclamationmark.triangle.fill"
+                    if model.target.isPDF {
+                        previewRow(Localized.text("PDF page"), pdfPageDescription(for: first))
+                        previewRow(Localized.text("First file"), Localized.text("%d page(s)", pagesForPreview))
+                        previewRow(Localized.text("Example name"), examplePDFName(for: first), monospaced: true)
+                    } else {
+                        let size = first.document.size
+                        let scale = effectiveScale(for: first)
+                        let width = Int((size.width * scale).rounded())
+                        let height = Int((size.height * scale).rounded())
+                        previewRow(Localized.text("Each image"), "\(width) × \(height) px")
+                        previewRow(
+                            Localized.text("First file"),
+                            Localized.text(
+                                "%d image(s) · %@",
+                                pagesForPreview,
+                                model.target.imageFormat?.displayName ?? ""
+                            )
                         )
-                        .font(.system(size: 11))
-                        .foregroundStyle(.orange)
+                        previewRow(Localized.text("Example name"), exampleImageName(for: first), monospaced: true)
+
+                        if Double(width * height) > Double(model.settings.maxPixels) {
+                            Label(
+                                Localized.text("This resolution is over the safety limit and will be rejected."),
+                                systemImage: "exclamationmark.triangle.fill"
+                            )
+                            .font(.system(size: 11))
+                            .foregroundStyle(.orange)
+                        }
                     }
                 }
             } else {
@@ -357,8 +484,57 @@ struct ConversionSettingsPanel: View {
         }
     }
 
+    private func effectiveScale(for item: QueueItem) -> Double {
+        if item.document.kind.isImage, !model.hasPDFInputs {
+            return model.settings.imageScale
+        }
+        return model.settings.effectiveScale
+    }
+
+    private var pagesForPreview: Int {
+        guard let first = model.items.first(where: { $0.document.pageCount > 0 }) else { return 0 }
+        if first.document.kind.isImage {
+            return model.convertibleItems.filter { $0.document.kind.isImage }.count
+        }
+        return model.settings.pages(outOf: first.document.pageCount).count
+    }
+
+    private func pdfPageDescription(for item: QueueItem) -> String {
+        switch model.settings.pdfPageSize {
+        case .fitImage:
+            let scale = effectiveScale(for: item)
+            let width = Int((item.document.size.width * scale).rounded())
+            let height = Int((item.document.size.height * scale).rounded())
+            return "\(width) × \(height) pt"
+        case .a4:
+            return "A4 · \(Int(model.settings.pdfMargin)) pt " + Localized.text("margin")
+        case .letter:
+            return "Letter · \(Int(model.settings.pdfMargin)) pt " + Localized.text("margin")
+        }
+    }
+
+    private func exampleImageName(for item: QueueItem) -> String {
+        OutputNaming.fileName(
+            for: item.name,
+            page: 1,
+            pageCount: max(item.document.pageCount, 1),
+            settings: model.settings
+        )
+    }
+
+    private func examplePDFName(for item: QueueItem) -> String {
+        let base = OutputNaming.expand(
+            pattern: model.settings.filenamePattern,
+            documentName: item.name,
+            page: nil,
+            pageCount: model.settings.mergeImagesIntoOnePDF ? model.convertibleItems.count : nil,
+            padsPageNumbers: model.settings.padsPageNumbers
+        )
+        return "\(base).pdf"
+    }
+
     private var referencePageCount: Int {
-        model.items.first?.document.pageCount ?? 0
+        model.items.first(where: { $0.document.kind == .pdf })?.document.pageCount ?? 0
     }
 
     @ViewBuilder

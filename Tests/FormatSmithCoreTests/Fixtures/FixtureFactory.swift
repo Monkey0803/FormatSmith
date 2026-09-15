@@ -110,6 +110,37 @@ enum FixtureFactory {
         return url
     }
 
+    /// 生成一张伪随机噪声图。
+    ///
+    /// 用于「压缩是否真的有用」这类测试：渐变图会被 Flate 压得比 JPEG 还小，
+    /// 拿它做基准会得出错误结论，只有接近照片的噪声内容才代表真实场景。
+    @discardableResult
+    static func makeNoisyImage(
+        width: Int = 200,
+        height: Int = 200,
+        named name: String = "noise",
+        in directory: URL
+    ) throws -> URL {
+        var generator = SystemRandomNumberGenerator()
+        let context = try BitmapContext.make(width: width, height: height, wantsAlpha: false)
+        for y in 0..<height {
+            for x in 0..<width {
+                let color = CGColor(
+                    red: Double.random(in: 0...1, using: &generator),
+                    green: Double.random(in: 0...1, using: &generator),
+                    blue: Double.random(in: 0...1, using: &generator),
+                    alpha: 1
+                )
+                context.setFillColor(color)
+                context.fill(CGRect(x: x, y: y, width: 1, height: 1))
+            }
+        }
+        guard let image = context.makeImage() else { throw FixtureError.cannotCreateContext }
+        let url = directory.appendingPathComponent("\(name).png")
+        try ImageEncoder.encode(image, format: .png, quality: 1).write(to: url)
+        return url
+    }
+
     /// 生成一张「部分区域未绘制」的 PNG，用于验证透明背景。
     @discardableResult
     static func makeTransparentImage(

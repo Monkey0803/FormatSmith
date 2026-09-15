@@ -78,9 +78,9 @@ OUT="$WORK/png"
 "$BIN" --convert "$SAMPLE" --format png --dpi 150 --out "$OUT" >/dev/null 2>&1
 expect_exit 0 $? "PNG conversion"
 # 400×300 pt at 150 dpi → 400/72*150 = 833, 300/72*150 = 625
-expect_file "$OUT/sample/sample-1.png" "first page written"
-expect_file "$OUT/sample/sample-3.png" "last page written"
-expect_size "$OUT/sample/sample-1.png" 833 625 "150 DPI dimensions"
+expect_file "$OUT/sample-1.png" "first page written"
+expect_file "$OUT/sample-3.png" "last page written"
+expect_size "$OUT/sample-1.png" 833 625 "150 DPI dimensions"
 
 echo "▶ Page range 2-3, JPEG, no subfolder…"
 OUT="$WORK/jpeg"
@@ -88,6 +88,12 @@ OUT="$WORK/jpeg"
 expect_exit 0 $? "JPEG conversion"
 expect_file "$OUT/doc-2.jpg" "page 2 written with .jpg extension"
 if [ -f "$OUT/doc-1.jpg" ]; then fail "page 1 should not have been written"; else pass "page range respected"; fi
+
+echo "▶ Subfolder opt-in…"
+OUT="$WORK/sub"
+"$BIN" --convert "$SAMPLE" --to png --dpi 72 --pages 1 --subfolder --out "$OUT" >/dev/null 2>&1
+expect_exit 0 $? "conversion with --subfolder"
+expect_file "$OUT/sample/sample-1.png" "file placed in a per-source subfolder"
 
 echo "▶ Transparency and background…"
 OUT="$WORK/alpha"
@@ -111,6 +117,42 @@ OUT="$WORK/dup"
 expect_file "$OUT/same.png" "original kept"
 expect_file "$OUT/same-1.png" "second run wrote a suffixed file"
 
+echo "▶ PDF → PNG (used as image input below)…"
+IMG_DIR="$WORK/images"
+"$BIN" --convert "$SAMPLE" --to png --dpi 72 --out "$IMG_DIR" >/dev/null 2>&1
+expect_exit 0 $? "PDF to PNG"
+expect_file "$IMG_DIR/sample-1.png" "image available for the next checks"
+
+echo "▶ Image → image…"
+OUT="$WORK/img2img"
+"$BIN" --convert "$IMG_DIR/sample-1.png" --to jpeg --quality 0.8 --out "$OUT" --pattern "shot" >/dev/null 2>&1
+expect_exit 0 $? "PNG to JPEG"
+expect_file "$OUT/shot.jpg" "JPEG written with .jpg extension"
+
+OUT="$WORK/half"
+"$BIN" --convert "$IMG_DIR/sample-1.png" --to png --scale 0.5 --out "$OUT" --pattern "half" >/dev/null 2>&1
+expect_exit 0 $? "image scaling"
+expect_size "$OUT/half.png" 200 150 "50% of 400×300"
+
+echo "▶ Image → PDF…"
+OUT="$WORK/album"
+"$BIN" --convert "$IMG_DIR/sample-1.png" "$IMG_DIR/sample-2.png" "$IMG_DIR/sample-3.png" \
+    --to pdf --out "$OUT" --pattern "album" >/dev/null 2>&1
+expect_exit 0 $? "merge three images into one PDF"
+expect_file "$OUT/album.pdf" "merged PDF written"
+
+OUT="$WORK/a4"
+"$BIN" --convert "$IMG_DIR/sample-1.png" --to pdf --pdf-page-size a4 --pdf-compress \
+    --quality 0.6 --out "$OUT" --pattern "a4" >/dev/null 2>&1
+expect_exit 0 $? "A4 page size with JPEG compression"
+
+OUT="$WORK/separate"
+"$BIN" --convert "$IMG_DIR/sample-1.png" "$IMG_DIR/sample-2.png" --to pdf --no-merge \
+    --out "$OUT" --pattern "{name}" >/dev/null 2>&1
+expect_exit 0 $? "one PDF per image when merging is off"
+expect_file "$OUT/sample-1.pdf" "first separate PDF"
+expect_file "$OUT/sample-2.pdf" "second separate PDF"
+
 echo "▶ Error handling…"
 "$BIN" --convert "$WORK/does-not-exist.pdf" --format png --out "$WORK/none" >/dev/null 2>&1
 expect_exit 1 $? "missing input file"
@@ -120,6 +162,22 @@ expect_exit 2 $? "unknown format"
 
 "$BIN" --convert "$SAMPLE" --format png --dpi 20000 --pages 1 --out "$WORK/none" >/dev/null 2>&1
 expect_exit 1 $? "absurd resolution is rejected"
+
+# WebP 只能读不能写，错误信息应当说明这一点，而不是笼统的「未知格式」
+WEBP_MSG="$("$BIN" --convert "$IMG_DIR/sample-1.png" --to webp --out "$WORK/none" 2>&1)"
+if printf '%s' "$WEBP_MSG" | grep -qi "not written"; then
+    pass "read-only format explains itself"
+else
+    fail "WebP rejection message is unhelpful: $WEBP_MSG"
+fi
+
+# 路线图上的功能要先明确说「还没有」，而不是静默失败
+PDF2PDF_MSG="$("$BIN" --convert "$SAMPLE" --to pdf --out "$WORK/none" 2>&1)"
+if printf '%s' "$PDF2PDF_MSG" | grep -qi "not available"; then
+    pass "unimplemented route reports clearly"
+else
+    fail "PDF → PDF message is unclear: $PDF2PDF_MSG"
+fi
 
 echo "▶ Version and help…"
 "$BIN" --version >/dev/null 2>&1

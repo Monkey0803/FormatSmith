@@ -68,7 +68,7 @@ struct BottomBarView: View {
                     }
                     .controlSize(.large)
                     .buttonStyle(.borderedProminent)
-                    .disabled(model.items.isEmpty)
+                    .disabled(!model.canConvert)
                 }
             }
             .padding(.horizontal, 14)

@@ -18,6 +18,26 @@ public enum ImageEncoder {
         )
     }
 
+    /// 让图像满足目标格式的通道要求。
+    ///
+    /// 带透明通道的图要写进不支持 alpha 的格式时，必须先铺一层背景，
+    /// 否则透明区域会变成黑色 —— 这是用户最容易察觉、也最难自己解释的一类差异。
+    public static func prepare(
+        _ image: CGImage,
+        for format: ImageFormat,
+        background: ImageBackground
+    ) throws -> CGImage {
+        guard image.hasAlphaChannel, !format.supportsAlpha else { return image }
+
+        let context = try BitmapContext.make(width: image.width, height: image.height, wantsAlpha: false)
+        context.fill(with: background == .black ? .black : .white)
+        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        guard let flattened = context.makeImage() else {
+            throw ConversionError(Localized.text("Rendering failed."))
+        }
+        return flattened
+    }
+
     /// 编码为指定格式。
     public static func encode(_ image: CGImage, format: ImageFormat, quality: Double) throws -> Data {
         try validate(image, for: format)

@@ -101,9 +101,9 @@ struct EmptyDropZone: View {
             }
 
             VStack(spacing: 6) {
-                Text(isTargeted ? Localized.text("Release to add") : Localized.text("Drop PDF files here"))
+                Text(isTargeted ? Localized.text("Release to add") : Localized.text("Drop files here"))
                     .font(.title2.weight(.semibold))
-                Text(Localized.text("Multiple files are fine — folders work too, PDFs inside are found automatically."))
+                Text(Localized.text("PDFs and images. Multiple files are fine, and folders work too."))
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -113,7 +113,7 @@ struct EmptyDropZone: View {
             Button {
                 model.chooseInputFiles()
             } label: {
-                Text(Localized.text("Choose PDFs…"))
+                Text(Localized.text("Choose Files…"))
                     .frame(minWidth: 120)
             }
             .controlSize(.large)
@@ -188,7 +188,7 @@ struct QueueRowView: View {
                     .aspectRatio(contentMode: .fit)
                     .padding(2)
             } else {
-                Image(systemName: "doc.text")
+                Image(systemName: item.document.kind.isImage ? "photo" : "doc.text")
                     .foregroundStyle(.secondary)
             }
         }
@@ -204,6 +204,15 @@ struct QueueRowView: View {
         case .loading:
             return Localized.text("Reading…")
         case .ready:
+            if item.document.kind.isImage {
+                let size = item.document.size
+                return Localized.text(
+                    "%@ · %d × %d px",
+                    item.document.kind.displayName,
+                    Int(size.width),
+                    Int(size.height)
+                )
+            }
             return Localized.text("%d page(s) · ready", item.document.pageCount)
         case let .converting(done, total):
             return Localized.text("Converting %d of %d", done, total)

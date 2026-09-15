@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Image → image conversion: any readable format to any writable one, with scaling from 0.5× to 4×
+  (or any custom factor). WebP, JPEG XL, HEIC and camera RAW files can now be used as input.
+- Image → PDF conversion, including merging a multi-file selection into one document. Page size can
+  match the image (1 px = 1 pt) or fit A4/Letter with a configurable margin, and embedded images can
+  optionally be JPEG-compressed to shrink the output.
+- `ConversionRouter`: one table that decides which pipeline a combination uses, shared by the app and
+  the CLI. Combinations that are planned but not built yet, and those that are impossible, are
+  reported with a reason instead of failing generically.
+- CLI: `--to pdf`, `--pdf-page-size`, `--pdf-margin`, `--pdf-compress`, `--merge` / `--no-merge`,
+  `--subfolder`, and image inputs for `--convert`.
 - `FormatSmithCore` library split out from the app so the conversion engine can be tested headlessly.
 - Runtime capability detection for image formats, driven by ImageIO instead of a hardcoded list.
 - English/Simplified-Chinese localization (`Resources/i18n`), with English source strings as the keys.
@@ -20,6 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Renamed the project from `PDF2Image` to `FormatSmith` to match its broader scope.
 - Output file names for JPEG now use the `.jpg` extension (the system reports `.jpeg`).
+- CLI output is always English, whatever the system language, so scripts can parse it. The app window
+  remains localized.
+- The CLI writes straight into `--out` by default; pass `--subfolder` for a folder per source file.
+  The app keeps per-file folders on by default.
 - `InputKind` recognises image files by extension when no UTType is available.
 
 ### Fixed

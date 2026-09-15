@@ -4,13 +4,13 @@
 locally through Apple's own frameworks — nothing is uploaded, and there is no third-party dependency
 in the app itself.
 
-> Status: the conversion engine, the app shell and the CLI are in place for **PDF → image**. The
-> remaining directions are being built in the open; see the [roadmap](#roadmap).
+> Status: **PDF → image**, **image → image** and **image → PDF** work today, in both the app and the
+> CLI. The remaining directions are being built in the open; see the [roadmap](#roadmap).
 
 ## Features
 
-- **Drag and drop** PDFs, click to pick them, drop a whole folder (PDFs inside are found for you), or
-  use *Open With → FormatSmith*.
+- **Drag and drop** PDFs and images, click to pick them, drop a whole folder (supported files inside
+  are found for you), or use *Open With → FormatSmith*.
 - **Seven output formats** by default — PNG, JPEG, HEIC, AVIF, TIFF, GIF, BMP — plus the long tail
   (JPEG 2000, Photoshop, Targa, OpenEXR, PBM, Windows Icon) behind one switch.
 - **HD or print resolution**: pick a DPI (72–600) or a scale factor (1×–4×).
@@ -20,7 +20,12 @@ in the app itself.
   zero-padded page numbers. Existing files are never overwritten.
 - **Honest feedback**: per-file progress, a running total, cancel at any time, and "Show in Finder"
   when a file is done.
-- **A real CLI** in the same binary, for scripts and batch jobs.
+- **Images → PDF**: one PDF per image, or merge a whole selection into a single multi-page document,
+  with a page size that either matches the image or fits A4/Letter with a margin. Embed losslessly, or
+  JPEG-compress the images to keep the file small.
+- **Images → images**: convert between formats and scale up or down (50%–400% or any custom factor).
+- **A real CLI** in the same binary, for scripts and batch jobs. Its output stays in English
+  regardless of system language, so scripts can rely on it.
 
 The format list is not hardcoded. It is read from ImageIO at runtime, so a macOS update that adds a
 format adds it here — and the app tells you *why* something is unavailable instead of failing
@@ -76,15 +81,20 @@ dist/FormatSmith.app/Contents/MacOS/FormatSmith --list-formats
 
 | Flag | Meaning |
 | --- | --- |
-| `--convert <a.pdf …>` | Files to convert |
-| `--format <name>` | `png`, `jpeg`, `heic`, `avif`, `tiff`, `gif`, `bmp`, … (default `png`) |
+| `--convert <file …>` | Files to convert (PDF or image) |
+| `--to <target>` | An image format (`png`, `jpeg`, `heic`, …) or `pdf` (default `png`) |
+| `--format <name>` | Alias of `--to` |
 | `--quality <0.05-1>` | Quality for lossy formats (default `0.9`) |
 | `--dpi <n>` / `--scale <n>` | Resolution (default `200` DPI) |
 | `--pages <range>` | e.g. `1-3,5,8-10` (default: all) |
 | `--out <dir>` | Output directory (default: current directory) |
 | `--pattern <template>` | File name template using `{name}` `{page}` `{total}` `{date}` `{time}` |
 | `--background <c>` | `white`, `black`, `transparent` |
-| `--no-subfolder` | Write straight into `--out` |
+| `--subfolder` | Create a subfolder per source file (off by default in the CLI) |
+| `--pdf-page-size <s>` | `fit`, `a4`, or `letter` (default `fit`) |
+| `--pdf-margin <pt>` | Margin for fixed page sizes (default `24`) |
+| `--pdf-compress` | JPEG-compress embedded images to shrink the PDF |
+| `--merge` / `--no-merge` | Merge several images into one PDF (default: merge) |
 | `--list-formats` | List output formats available on this Mac |
 | `--version`, `--help` | Version / usage |
 
@@ -96,8 +106,8 @@ Set `FORMATSMITH_DEBUG=1` for a trace of file intake and metadata reads.
 ## Roadmap
 
 - [x] PDF → image (PNG, JPEG, HEIC, AVIF, TIFF, GIF, BMP, …)
-- [ ] Image → image, including WebP, JPEG XL, HEIC and RAW input
-- [ ] Image → PDF (combine several images into one document)
+- [x] Image → image, including WebP, JPEG XL, HEIC and RAW input
+- [x] Image → PDF (combine several images into one document)
 - [ ] PDF toolbox: merge, split, extract pages, rotate, compress
 - [ ] Documents → PDF (Office via LibreOffice, HTML natively, Markdown via pandoc)
 - [ ] Presets, concurrent conversion, and dragging results out to Finder
@@ -134,6 +144,23 @@ you plan to touch the rendering code:
   knowledge, and the encoder validates before writing.
 - **"Transparent" plus an opaque format must degrade to a real colour**, otherwise unpainted areas
   come out black.
+- **Image → PDF goes through `CGPDFContext`, not ImageIO**, because ImageIO writes a page per image
+  sized in pixels and gives no control over page size or margins. When JPEG compression is on, the
+  compressed image is re-imported so Core Graphics can embed it with `DCTDecode` instead of
+  re-encoding it losslessly — verify with `grep -c DCTDecode` if you ever doubt it.
+
+## Which direction goes through which pipeline
+
+`ConversionRouter` decides, and the UI reads the same table, so a route is either available
+everywhere or reported as unavailable everywhere:
+
+| Input | Target | Pipeline |
+| --- | --- | --- |
+| PDF | image | Rasterise each page at the chosen DPI |
+| PDF | PDF | PDF toolbox (planned) |
+| image | image | Decode, scale, re-encode |
+| image | PDF | `PDFComposer`, optionally merging several files |
+| Office / HTML / Markdown | PDF | Planned; documents → images is rejected with an explanation |
 
 ## Contributing
 
