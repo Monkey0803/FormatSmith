@@ -203,6 +203,8 @@ enum CommandLineTool {
                     } else if normalized == "two" || normalized == "2" {
                         settings.pdfLayout = .twoPerPage
                         settings.target = .pdf
+                        // 一页两张需要固定纸张，与界面保持一致
+                        if settings.pdfPageSize == .fitImage { settings.pdfPageSize = .a4 }
                     } else {
                         fail("Use --pdf-layout one or two.")
                     }

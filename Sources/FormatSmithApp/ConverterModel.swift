@@ -425,14 +425,17 @@ final class ConverterModel: ObservableObject {
             guard manager.fileExists(atPath: url.path, isDirectory: &isDirectory) else { continue }
 
             if isDirectory.boolValue {
+                // 文件夹里的顺序是文件系统给的，不可靠，按名字排一下
                 let enumerator = manager.enumerator(
                     at: url,
                     includingPropertiesForKeys: [.isRegularFileKey, .contentTypeKey],
                     options: [.skipsHiddenFiles, .skipsPackageDescendants]
                 )
+                var inside: [URL] = []
                 while let child = enumerator?.nextObject() as? URL, isSupported(child) {
-                    result.append(child)
+                    inside.append(child)
                 }
+                result.append(contentsOf: inside.sorted { Self.isOrderedBefore($0, $1) })
             } else if isSupported(url) {
                 result.append(url)
             } else {
@@ -440,9 +443,17 @@ final class ConverterModel: ObservableObject {
             }
         }
 
-        return result.sorted {
-            $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending
-        }
+        // 显式给出的文件**保持用户给的顺序**。
+        //
+        // 之前这里统一按文件名排序，结果「先拖正面、再拖反面」会被排成 back、front ——
+        // 身份证正反面这类有先后含义的输入就被悄悄调换了。
+        // 需要别的顺序时，列表里的 ↑ ↓ 可以调。
+        return result
+    }
+
+    /// 文件夹内的排序用。
+    private static func isOrderedBefore(_ lhs: URL, _ rhs: URL) -> Bool {
+        lhs.lastPathComponent.localizedStandardCompare(rhs.lastPathComponent) == .orderedAscending
     }
 
     /// 当前支持的输入：PDF、图片，以及能转成 PDF 的文档。
@@ -491,6 +502,35 @@ final class ConverterModel: ObservableObject {
                 )
             }
         }
+    }
+
+    /// 上移一项。合并类任务（身份证正反面、多图 PDF）里顺序是有含义的。
+    func moveUp(id: UUID) {
+        guard !isConverting,
+            let index = items.firstIndex(where: { $0.id == id }), index > 0
+        else { return }
+        items.swapAt(index, index - 1)
+        scheduleIDPhotoPreview()
+    }
+
+    /// 下移一项。
+    func moveDown(id: UUID) {
+        guard !isConverting,
+            let index = items.firstIndex(where: { $0.id == id }), index < items.count - 1
+        else { return }
+        items.swapAt(index, index + 1)
+        scheduleIDPhotoPreview()
+    }
+
+    /// 该项能不能上移 / 下移，用于决定按钮是否可用。
+    func canMoveUp(id: UUID) -> Bool {
+        guard !isConverting, let index = items.firstIndex(where: { $0.id == id }) else { return false }
+        return index > 0
+    }
+
+    func canMoveDown(id: UUID) -> Bool {
+        guard !isConverting, let index = items.firstIndex(where: { $0.id == id }) else { return false }
+        return index < items.count - 1
     }
 
     func remove(id: UUID) {

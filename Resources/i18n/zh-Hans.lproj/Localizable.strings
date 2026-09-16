@@ -122,6 +122,8 @@
 "Merge all images into one PDF" = "把所有图片合并成一个 PDF";
 "Merged %d PDFs → %@" = "已合并 %d 个 PDF → %@";
 "Missing tools" = "缺少依赖";
+"Move down" = "下移";
+"Move up" = "上移";
 "No face was detected, so the photo was centred instead." = "没有检测到人脸，已改为居中构图。";
 "No page matches this range." = "没有页码落在该范围内。";
 "No person was detected, so the original background was kept." = "没有检测到人像，已保留原背景。";
@@ -179,6 +181,7 @@
 "The converter did not finish in time." = "转换器没有在限定时间内完成。";
 "The converter did not finish within %d seconds." = "转换器在 %d 秒内没有完成。";
 "The converter failed (exit %d): %@" = "转换器失败（退出码 %d）：%@";
+"The first file in the list goes on top — use ↑ ↓ to reorder." = "列表中在前的一张排在上面——可用 ↑ ↓ 调整顺序。";
 "The output would be about %.0f megapixels, over the %.0f megapixel safety limit. Lower the DPI or scale." = "输出约为 %.0f 百万像素，超过 %.0f 百万像素的安全上限，请降低 DPI 或倍数。";
 "The page range is empty or invalid." = "页码范围为空或不合法。";
 "The subject is cut out with on-device person segmentation." = "人像用系统本地的人像分割自动抠出，照片不会离开这台机器。";

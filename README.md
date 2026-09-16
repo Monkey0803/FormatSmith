@@ -43,6 +43,8 @@ in the app itself.
   segmentation (macOS Vision, nothing leaves the machine) and the photo is composed around the face.
   You can also tile the result onto 5-inch / 6-inch photo paper, ready to print and cut.
 - **ID scans**: put the front and back of an ID card on a single A4 page (`--pdf-layout two`).
+  Files keep the order you give them, and the queue has ↑ ↓ buttons, so "front on top" is under your
+  control rather than decided by the file names.
 - **PDF toolbox**: merge several PDFs, split one every N pages, extract just the pages you list,
   rotate every page by 90/180/270°, or compress by re-rasterising at a lower DPI. Compressing is
   lossy by design and the app says so before you run it.
@@ -130,7 +132,7 @@ dist/FormatSmith.app/Contents/MacOS/FormatSmith --list-formats
 | `--id-bg <colour>` | `white`, `blue`, `red`, or `keep` |
 | `--no-face-crop` | Centre the photo instead of composing around the face |
 | `--sheet <paper>` | `five-inch`, `six-inch`, or `a4` — tile the photo onto a printable sheet |
-| `--pdf-layout <n>` | `one` or `two` images per page |
+| `--pdf-layout <n>` | `one` or `two` images per page (two forces A4) |
 | `--split-every <n>` | Pages per file when splitting |
 | `--rotate <deg>` | `90`, `180`, or `270` |
 | `--check-dependencies` | Report whether LibreOffice and pandoc were found |
@@ -253,6 +255,21 @@ Cutting the subject out uses `VNGeneratePersonSegmentationRequest`, and the comp
 `VNDetectFaceRectanglesRequest` to place the face where the standard wants it (face width ≈ 55% of
 the frame, eye line ≈ 44% from the top). Both run locally. If no person is detected the original
 background is kept and the app says so, rather than replacing the whole photo with a flat colour.
+
+## Putting an ID card on one page
+
+Three ways, all producing the same A4 page with the front on top and the back below:
+
+1. **Preset** — drop both images in, click **ID scan** in the presets row. That sets the target to PDF,
+   two per page, A4, and JPEG compression in one go.
+2. **Manually** — add both images, set the output format to **PDF**, then in the *PDF page* card choose
+   **Two per page**. The paper switches to A4 automatically (two images need a fixed page size).
+3. **CLI** — `formatsmith --convert front.jpg back.jpg --to pdf --pdf-layout two --out ~/Desktop`
+
+Order comes from the queue: the first file goes on top. If you dragged them in the wrong order, use the
+↑ ↓ buttons on the row — dragging a file no longer gets re-sorted by name behind your back. Photos of
+different sizes are each fitted into their half, so a phone photo of the front and a flatbed scan of
+the back both come out readable.
 
 ## Why there is a pixel limit
 

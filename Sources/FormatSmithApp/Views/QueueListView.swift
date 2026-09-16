@@ -159,6 +159,7 @@ struct QueueRowView: View {
             }
             Spacer(minLength: 6)
             statusBadge
+            reorderButtons
             Button {
                 model.remove(id: item.id)
             } label: {
@@ -183,6 +184,42 @@ struct QueueRowView: View {
                 .strokeBorder(Color.secondary.opacity(0.14), lineWidth: 1)
         )
         .localizedText(model.language)
+    }
+
+    /// 上移 / 下移。多图合并成一页或一册时，顺序就是正反面顺序。
+    @ViewBuilder
+    private var reorderButtons: some View {
+        if model.items.count > 1 {
+            HStack(spacing: 0) {
+                Button {
+                    model.moveUp(id: item.id)
+                } label: {
+                    Image(systemName: "chevron.up")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(model.canMoveUp(id: item.id) ? Color.secondary : Color.secondary.opacity(0.3))
+                        .padding(4)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .disabled(!model.canMoveUp(id: item.id))
+                .help(Localized.text("Move up"))
+
+                Button {
+                    model.moveDown(id: item.id)
+                } label: {
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(
+                            model.canMoveDown(id: item.id) ? Color.secondary : Color.secondary.opacity(0.3)
+                        )
+                        .padding(4)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .disabled(!model.canMoveDown(id: item.id))
+                .help(Localized.text("Move down"))
+            }
+        }
     }
 
     private var thumbnail: some View {

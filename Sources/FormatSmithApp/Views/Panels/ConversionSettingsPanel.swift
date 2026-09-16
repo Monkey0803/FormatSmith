@@ -657,7 +657,14 @@ struct ConversionSettingsPanel: View {
                 "",
                 selection: Binding(
                     get: { model.settings.pdfLayout },
-                    set: { model.settings.pdfLayout = $0 }
+                    set: { layout in
+                        model.settings.pdfLayout = layout
+                        // 一页两张必须有固定纸张：顺手把设置改过去，
+                        // 免得选择器显示「跟随图片」而实际输出的是 A4
+                        if layout == .twoPerPage, model.settings.pdfPageSize == .fitImage {
+                            model.settings.pdfPageSize = .a4
+                        }
+                    }
                 )
             ) {
                 ForEach(PDFPageLayout.allCases) { layout in
@@ -671,6 +678,13 @@ struct ConversionSettingsPanel: View {
                 .font(.system(size: 11))
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
+
+            if model.settings.pdfLayout == .twoPerPage, model.convertibleItems.count > 1 {
+                Text(Localized.text("The first file in the list goes on top — use ↑ ↓ to reorder."))
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             Picker(
                 "",

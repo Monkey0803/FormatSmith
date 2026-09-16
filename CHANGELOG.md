@@ -105,8 +105,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ICO output that is not a 16–256 px square now reports what is wrong instead of a generic
   "finalize failed" error.
 
+### Added
+
+- ↑ ↓ buttons on each queue row, and files now keep the order you gave them. Both matter for the ID
+  scan case: `add()` used to sort everything by file name, so dragging "front" then "back" silently
+  became "back" then "front" and the two sides landed the wrong way round on the page.
+
 ### Fixed
 
+- Choosing "Two per page" now switches the paper setting to A4 instead of leaving the picker showing
+  "Match image" while the output was A4 anyway.
 - **"This resolution is over the safety limit" was reported for jobs that were nowhere near it.**
   The estimate ignored ID photo mode: with 300 DPI it computed "input size × scale", so a 12 MP photo
   became 212 MP on paper while the actual output was 295×413. Estimates are now computed per pipeline
