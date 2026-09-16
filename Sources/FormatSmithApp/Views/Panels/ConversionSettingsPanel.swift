@@ -318,8 +318,7 @@ struct ConversionSettingsPanel: View {
             photo: model.settings.idPhotoSize,
             sheet: model.settings.printSheet,
             marginMM: model.settings.printSheetMarginMM,
-            gapMM: model.settings.printSheetGapMM,
-            dpi: model.settings.dpi
+            gapMM: model.settings.printSheetGapMM
         )
 
         Toggle(

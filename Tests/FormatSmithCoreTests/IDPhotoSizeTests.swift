@@ -61,25 +61,26 @@ final class IDPhotoSizeTests: XCTestCase {
 final class PhotoSheetTilerTests: XCTestCase {
 
     func testOneInchPhotosOnSixInchPaper() {
-        let plan = PhotoSheetTiler.layout(photo: .oneInch, sheet: .sixInch, marginMM: 2, gapMM: 1, dpi: 300)
+        let plan = PhotoSheetTiler.layout(photo: .oneInch, sheet: .sixInch, marginMM: 2, gapMM: 1)
         XCTAssertEqual(plan.columns, 3)
         XCTAssertEqual(plan.rows, 4)
         XCTAssertEqual(plan.count, 12)
     }
 
     func testTwoInchPhotosFitFewerPerSheet() {
-        let oneInch = PhotoSheetTiler.layout(photo: .oneInch, sheet: .sixInch, marginMM: 2, gapMM: 1, dpi: 300)
-        let twoInch = PhotoSheetTiler.layout(photo: .twoInch, sheet: .sixInch, marginMM: 2, gapMM: 1, dpi: 300)
+        let oneInch = PhotoSheetTiler.layout(photo: .oneInch, sheet: .sixInch, marginMM: 2, gapMM: 1)
+        let twoInch = PhotoSheetTiler.layout(photo: .twoInch, sheet: .sixInch, marginMM: 2, gapMM: 1)
         XCTAssertLessThan(twoInch.count, oneInch.count, "二寸照更大，一张相纸能放的张数应更少")
         XCTAssertGreaterThan(twoInch.count, 0)
     }
 
     func testAllCellsStayInsideThePaper() {
         for sheet in PrintSheet.allCases {
-            let plan = PhotoSheetTiler.layout(photo: .oneInch, sheet: sheet, marginMM: 2, gapMM: 1, dpi: 300)
+            let plan = PhotoSheetTiler.layout(photo: .oneInch, sheet: sheet, marginMM: 2, gapMM: 1)
+            // 版面单位是点
             let paper = CGSize(
-                width: sheet.widthMM * 300 / 25.4,
-                height: sheet.heightMM * 300 / 25.4
+                width: sheet.widthMM * IDPhotoSize.pointsPerMillimetre,
+                height: sheet.heightMM * IDPhotoSize.pointsPerMillimetre
             )
             XCTAssertGreaterThan(plan.count, 0, "\(sheet.displayName) 至少应放得下一张")
             for cell in plan.cells {
@@ -92,7 +93,7 @@ final class PhotoSheetTilerTests: XCTestCase {
     }
 
     func testCellsDoNotOverlap() {
-        let plan = PhotoSheetTiler.layout(photo: .oneInch, sheet: .sixInch, marginMM: 2, gapMM: 1, dpi: 300)
+        let plan = PhotoSheetTiler.layout(photo: .oneInch, sheet: .sixInch, marginMM: 2, gapMM: 1)
         for (index, first) in plan.cells.enumerated() {
             for second in plan.cells[(index + 1)...] {
                 XCTAssertFalse(first.intersects(second), "照片之间不应重叠: \(first) / \(second)")
@@ -101,8 +102,8 @@ final class PhotoSheetTilerTests: XCTestCase {
     }
 
     func testLayoutIsCentredOnThePaper() {
-        let plan = PhotoSheetTiler.layout(photo: .oneInch, sheet: .sixInch, marginMM: 2, gapMM: 1, dpi: 300)
-        let paperWidth = PrintSheet.sixInch.widthMM * 300 / 25.4
+        let plan = PhotoSheetTiler.layout(photo: .oneInch, sheet: .sixInch, marginMM: 2, gapMM: 1)
+        let paperWidth = PrintSheet.sixInch.widthMM * IDPhotoSize.pointsPerMillimetre
 
         let leftmost = plan.cells.map(\.minX).min()!
         let rightmost = plan.cells.map(\.maxX).max()!
@@ -111,14 +112,15 @@ final class PhotoSheetTilerTests: XCTestCase {
 
     func testTooBigPhotoForTinySheetYieldsNoLayout() {
         // 三寸照放到 5 寸相纸上：按尺寸算其实放得下，但边距吃掉空间后不该算出负数
-        let plan = PhotoSheetTiler.layout(photo: .threeInch, sheet: .fiveInch, marginMM: 60, gapMM: 5, dpi: 300)
+        let plan = PhotoSheetTiler.layout(photo: .threeInch, sheet: .fiveInch, marginMM: 60, gapMM: 5)
         XCTAssertEqual(plan.count, 0, "边距过大时应当算出「放不下」而不是负数量")
     }
 
-    func testRenderProducesSheetSizedImageWithPhotosOnIt() throws {
-        // 造一张纯红的「证件照」，铺到相纸上后：相纸是白的，照片格子应是红的
+    func testRenderPlacesEveryPhotoInItsOwnCell() throws {
+        // 每个格子的中心都应当是照片，格子之间的缝隙与纸张留白应当是白的。
+        // 这条断言专门盯着「单位算错」——曾经整张相纸只印出一张被放大 4 倍的巨型照片，
+        // 而当时那条只看尺寸的用例照样通过。
         let photo = try makeRedImage(width: 120, height: 168)
-
         let sheet = try PhotoSheetTiler.render(
             photo: photo,
             photoSize: .oneInch,
@@ -134,22 +136,56 @@ final class PhotoSheetTilerTests: XCTestCase {
         XCTAssertEqual(sheet.height, expected.height)
 
         let probe = try PixelProbe(sheet)
-        let plan = PhotoSheetTiler.layout(photo: .oneInch, sheet: .sixInch, marginMM: 2, gapMM: 1, dpi: 300)
+        let plan = PhotoSheetTiler.layout(photo: .oneInch, sheet: .sixInch, marginMM: 2, gapMM: 1)
+        XCTAssertEqual(plan.count, 12)
         let scale = CGFloat(expected.width) / (CGFloat(PrintSheet.sixInch.widthMM) * IDPhotoSize.pointsPerMillimetre)
 
-        // 第一张照片的中心应当是红的（探针的 y 从上往下数）
-        let first = plan.cells[0]
-        let centreX = Int((first.midX * scale).rounded())
-        let centreY = sheet.height - Int((first.midY * scale).rounded())
-        XCTAssertTrue(
-            probe.pixel(x: centreX, y: centreY).isClose(to: .red, tolerance: 30),
-            "照片位置上应当是红的，实际 \(probe.pixel(x: centreX, y: centreY))"
+        for (index, cell) in plan.cells.enumerated() {
+            let centreX = Int((cell.midX * scale).rounded())
+            let centreY = sheet.height - Int((cell.midY * scale).rounded())
+            let pixel = probe.pixel(x: centreX, y: centreY)
+            XCTAssertTrue(
+                pixel.isClose(to: .red, tolerance: 30),
+                "第 \(index + 1) 张照片的中心应当是红的，实际 \(pixel)（格子 \(cell)）"
+            )
+        }
+
+        // 纸张四角是留白
+        for point in [(4, 4), (sheet.width - 5, 4), (4, sheet.height - 5), (sheet.width - 5, sheet.height - 5)] {
+            XCTAssertTrue(
+                probe.pixel(x: point.0, y: point.1).isClose(to: .white, tolerance: 12),
+                "纸张角落 \(point) 应当是白的，实际 \(probe.pixel(x: point.0, y: point.1))"
+            )
+        }
+    }
+
+    func testRenderedPhotoAreaMatchesTheLayout() throws {
+        // 红色像素的总面积应当约等于「张数 × 单张面积」。
+        // 照片被放大或缩小都会让这个数字对不上。
+        let photo = try makeRedImage(width: 120, height: 168)
+        let sheet = try PhotoSheetTiler.render(
+            photo: photo, photoSize: .oneInch, sheet: .sixInch, dpi: 300,
+            marginMM: 2, gapMM: 1, cutGuides: false
         )
 
-        // 相纸角落应当是白的
-        XCTAssertTrue(
-            probe.pixel(x: 5, y: 5).isClose(to: .white, tolerance: 12),
-            "相纸留白处应当是白的，实际 \(probe.pixel(x: 5, y: 5))"
+        let probe = try PixelProbe(sheet)
+        var redPixels = 0
+        for y in stride(from: 0, to: sheet.height, by: 2) {
+            for x in stride(from: 0, to: sheet.width, by: 2) {
+                if probe.pixel(x: x, y: y).r > 180, probe.pixel(x: x, y: y).g < 120 { redPixels += 1 }
+            }
+        }
+        // 抽样步长是 2，所以换算回全图要乘 4
+        let redArea = Double(redPixels) * 4
+
+        let plan = PhotoSheetTiler.layout(photo: .oneInch, sheet: .sixInch, marginMM: 2, gapMM: 1)
+        let scale = CGFloat(sheet.width) / (CGFloat(PrintSheet.sixInch.widthMM) * IDPhotoSize.pointsPerMillimetre)
+        let expectedArea =
+            Double(plan.count) * Double(plan.cellSize.width * scale) * Double(plan.cellSize.height * scale)
+
+        XCTAssertEqual(
+            redArea, expectedArea, accuracy: expectedArea * 0.06,
+            "照片总面积应当接近 \(Int(expectedArea))，实际 \(Int(redArea))"
         )
     }
 
@@ -163,7 +199,7 @@ final class PhotoSheetTilerTests: XCTestCase {
         )
 
         // 辅助线是灰色，会把照片边缘的像素拉离纯红
-        let plan = PhotoSheetTiler.layout(photo: .oneInch, sheet: .sixInch, marginMM: 2, gapMM: 1, dpi: 150)
+        let plan = PhotoSheetTiler.layout(photo: .oneInch, sheet: .sixInch, marginMM: 2, gapMM: 1)
         let paperPixels = PrintSheet.sixInch.pixelSize(dpi: 150)
         let scale = CGFloat(paperPixels.width) / (CGFloat(PrintSheet.sixInch.widthMM) * IDPhotoSize.pointsPerMillimetre)
         let first = plan.cells[0]

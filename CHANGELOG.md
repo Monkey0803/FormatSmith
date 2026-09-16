@@ -99,6 +99,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Photo sheets printed one giant photo instead of a grid.** `PhotoSheetTiler.layout` returned
+  pixel-based rects while `render` scaled the context to points, so every cell was drawn 4× too
+  large. The layout now works in points throughout, and the tests sample every cell centre plus the
+  gaps between cells — a whole-sheet size check passed happily while the sheet was wrong.
 - **Preset tiles only responded when you clicked the icon or the text.** Two separate causes, both
   fixed: a background applied *outside* the `Button` does not extend its hit area, and the transparent
   space from `.frame(maxWidth: .infinity)` is not hit-testable without an explicit `contentShape`.

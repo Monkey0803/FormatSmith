@@ -16,7 +16,10 @@ public enum PhotoSheetTiler {
         public var count: Int { cells.count }
     }
 
-    /// 计算排版。
+    /// 计算排版，所有尺寸单位都是**点**（1 pt = 1/72 inch）。
+    ///
+    /// 用点而不是像素：排版结果与输出分辨率无关，`render` 再负责点��像素的��算。
+    /// 之前这里按像素算、`render` 却按点画，结果整张相纸只印出一张巨型照片。
     ///
     /// 不写死「6 寸能放 8 张」这类经验值：相纸尺寸、照片尺寸、边距、间距都会变，
     /// 直接按能放几张算几张，数量交给界面显示。
@@ -24,10 +27,9 @@ public enum PhotoSheetTiler {
         photo: IDPhotoSize,
         sheet: PrintSheet,
         marginMM: Double,
-        gapMM: Double,
-        dpi: Double
+        gapMM: Double
     ) -> Layout {
-        let unit = max(dpi, 1) / 25.4
+        let unit = IDPhotoSize.pointsPerMillimetre
         let sheetWidth = sheet.widthMM * unit
         let sheetHeight = sheet.heightMM * unit
         let cellWidth = photo.widthMM * unit
@@ -92,7 +94,7 @@ public enum PhotoSheetTiler {
         gapMM: Double = 1,
         cutGuides: Bool = true
     ) throws -> CGImage {
-        let plan = layout(photo: photoSize, sheet: sheet, marginMM: marginMM, gapMM: gapMM, dpi: dpi)
+        let plan = layout(photo: photoSize, sheet: sheet, marginMM: marginMM, gapMM: gapMM)
         guard plan.count > 0 else {
             throw ConversionError(
                 Localized.text("This photo does not fit on the selected paper.")
@@ -108,7 +110,7 @@ public enum PhotoSheetTiler {
         // 相纸是白的
         context.fill(with: .white)
 
-        // 版面按点计算，绘制时按「相纸像素 / 相纸点数」放大
+        // 版面是点，画布是像素：这里做唯一的单位换算
         let scale = CGFloat(sheetPixels.width) / (CGFloat(sheet.widthMM) * IDPhotoSize.pointsPerMillimetre)
         context.saveGState()
         context.scaleBy(x: scale, y: scale)
