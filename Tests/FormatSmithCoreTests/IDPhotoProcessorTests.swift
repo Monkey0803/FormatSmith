@@ -7,16 +7,16 @@ import XCTest
 ///
 /// 真实的人像分割只认真人照片，没法用合成图验证，所以这里注入固定遮罩：
 /// 裁剪位置、缩放比例、底色填充这些能算对的部分，逐像素断言。
+/// 遮罩与人脸框都由测试指定。
+struct FixedAnalyzer: PersonMaskProviding {
+    let mask: CGImage?
+    let face: CGRect?
+
+    func personMask(for image: CGImage) throws -> CGImage? { mask }
+    func faceBounds(in image: CGImage) throws -> CGRect? { face }
+}
+
 final class IDPhotoProcessorTests: XCTestCase {
-
-    /// 遮罩与人脸框都由测试指定。
-    private struct FixedAnalyzer: PersonMaskProviding {
-        let mask: CGImage?
-        let face: CGRect?
-
-        func personMask(for image: CGImage) throws -> CGImage? { mask }
-        func faceBounds(in image: CGImage) throws -> CGRect? { face }
-    }
 
     // MARK: - 尺寸与底色
 
@@ -255,5 +255,138 @@ extension FixtureFactory.Palette {
         PixelProbe.RGBA(
             r: Int(blue.r * 255), g: Int(blue.g * 255), b: Int(blue.b * 255), a: 255
         )
+    }
+}
+
+/// 会话：反复调整参数时不该重复跑 Vision，而且结果必须与一次性调用一致。
+final class IDPhotoSessionTests: XCTestCase {
+
+    /// 记录分析被调用了多少次。
+    private final class CountingAnalyzer: PersonMaskProviding, @unchecked Sendable {
+        private let lock = NSLock()
+        private var maskCalls = 0
+        private var faceCalls = 0
+
+        let mask: CGImage?
+        let face: CGRect?
+
+        init(mask: CGImage?, face: CGRect?) {
+            self.mask = mask
+            self.face = face
+        }
+
+        var maskCallCount: Int {
+            lock.lock()
+            defer { lock.unlock() }
+            return maskCalls
+        }
+
+        var faceCallCount: Int {
+            lock.lock()
+            defer { lock.unlock() }
+            return faceCalls
+        }
+
+        func personMask(for image: CGImage) throws -> CGImage? {
+            lock.lock()
+            maskCalls += 1
+            lock.unlock()
+            return mask
+        }
+
+        func faceBounds(in image: CGImage) throws -> CGRect? {
+            lock.lock()
+            faceCalls += 1
+            lock.unlock()
+            return face
+        }
+    }
+
+    private func makeSource(width: Int = 400, height: Int = 500) throws -> CGImage {
+        let context = try BitmapContext.make(width: width, height: height, wantsAlpha: false)
+        context.setFillColor(FixtureFactory.color(FixtureFactory.Palette.red))
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        return try XCTUnwrap(context.makeImage())
+    }
+
+    private func makeMask(width: Int = 400, height: Int = 500) throws -> CGImage {
+        let data = Data([UInt8](repeating: 255, count: width * height))
+        let provider = try XCTUnwrap(CGDataProvider(data: data as CFData))
+        return try XCTUnwrap(
+            CGImage(
+                width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 8,
+                bytesPerRow: width, space: CGColorSpaceCreateDeviceGray(),
+                bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue),
+                provider: provider, decode: nil, shouldInterpolate: true, intent: .defaultIntent
+            )
+        )
+    }
+
+    func testAnalysisRunsOnceEvenWhenParametersChange() throws {
+        let analyzer = CountingAnalyzer(mask: try makeMask(), face: CGRect(x: 0.4, y: 0.6, width: 0.2, height: 0.2))
+        let session = IDPhotoSession(image: try makeSource(), analyzer: analyzer)
+
+        // 模拟用户连续调整：换尺寸、换底色、开关构图
+        _ = try session.render(size: .oneInch, background: .blue, dpi: 300, autoCrop: true)
+        _ = try session.render(size: .twoInch, background: .white, dpi: 300, autoCrop: true)
+        _ = try session.render(size: .oneInch, background: .red, dpi: 300, autoCrop: true)
+        _ = try session.render(size: .usVisa, background: .blue, dpi: 600, autoCrop: true)
+
+        XCTAssertEqual(analyzer.maskCallCount, 1, "遮罩只该算一次")
+        XCTAssertEqual(analyzer.faceCallCount, 1, "人脸只该检测一次")
+    }
+
+    func testSessionResultMatchesOneShotAPI() throws {
+        let source = try makeSource()
+        let mask = try makeMask()
+        let face = CGRect(x: 0.4, y: 0.6, width: 0.2, height: 0.2)
+
+        let session = IDPhotoSession(image: source, analyzer: FixedAnalyzer(mask: mask, face: face))
+        let viaSession = try session.render(size: .oneInch, background: .blue, dpi: 300, autoCrop: true)
+        let oneShot = try IDPhotoProcessor.makeIDPhoto(
+            from: source, size: .oneInch, background: .blue, dpi: 300,
+            autoCrop: true, analyzer: FixedAnalyzer(mask: mask, face: face)
+        )
+
+        XCTAssertEqual(viaSession.image.width, oneShot.image.width)
+        XCTAssertEqual(viaSession.image.height, oneShot.image.height)
+        XCTAssertEqual(viaSession.replacedBackground, oneShot.replacedBackground)
+        XCTAssertEqual(viaSession.usedFace, oneShot.usedFace)
+        XCTAssertEqual(viaSession.notes, oneShot.notes)
+
+        // 逐像素确认两条路径画出来的东西一样
+        let a = try PixelProbe(viaSession.image)
+        let b = try PixelProbe(oneShot.image)
+        for point in [(10, 10), (a.width / 2, a.height / 2), (a.width - 10, a.height - 10)] {
+            XCTAssertEqual(a.pixel(x: point.0, y: point.1), b.pixel(x: point.0, y: point.1))
+        }
+    }
+
+    func testSessionCachesAMissingMaskToo() throws {
+        // 没人像时也应当只算一次，别每次重试
+        let analyzer = CountingAnalyzer(mask: nil, face: nil)
+        let session = IDPhotoSession(image: try makeSource(), analyzer: analyzer)
+
+        let first = try session.render(size: .oneInch, background: .blue, dpi: 300)
+        let second = try session.render(size: .twoInch, background: .blue, dpi: 300)
+
+        XCTAssertEqual(analyzer.maskCallCount, 1)
+        XCTAssertFalse(first.replacedBackground)
+        XCTAssertFalse(second.replacedBackground)
+        XCTAssertTrue(first.notes.contains { $0.contains("person") || $0.contains("人像") })
+    }
+
+    func testMaskIsNotRequestedWhenTheBackgroundIsKept() throws {
+        let analyzer = CountingAnalyzer(mask: try makeMask(), face: nil)
+        let session = IDPhotoSession(image: try makeSource(), analyzer: analyzer)
+
+        _ = try session.render(size: .oneInch, background: .keep, dpi: 300, autoCrop: false)
+        XCTAssertEqual(analyzer.maskCallCount, 0, "保留原背景就不该去抠图")
+    }
+
+    func testSourceSizeIsReported() throws {
+        let session = IDPhotoSession(
+            image: try makeSource(width: 300, height: 400), analyzer: FixedAnalyzer(mask: nil, face: nil))
+        XCTAssertEqual(session.sourceSize, CGSize(width: 300, height: 400))
     }
 }

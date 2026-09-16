@@ -20,6 +20,20 @@ enum ItemStatus: Equatable {
     }
 }
 
+/// 证件照预览：真正跑一遍处理管线得到的结果，所见即所得。
+struct IDPhotoPreview: Equatable {
+    var photo: NSImage?
+    var sheet: NSImage?
+    var caption: String = ""
+    var notes: [String] = []
+    var isRendering = false
+    var failure: String?
+
+    var isEmpty: Bool {
+        photo == nil && sheet == nil && !isRendering && failure == nil
+    }
+}
+
 /// 输入文件 + 界面状态。
 struct QueueItem: Identifiable, Equatable {
     var document: SourceDocument
@@ -40,7 +54,10 @@ final class ConverterModel: ObservableObject {
 
     @Published var items: [QueueItem] = []
     @Published var settings: ConversionSettings {
-        didSet { persistSettings() }
+        didSet {
+            persistSettings()
+            scheduleIDPhotoPreview()
+        }
     }
     @Published var isConverting = false
     @Published var overallProgress: Double = 0
@@ -50,6 +67,8 @@ final class ConverterModel: ObservableObject {
         }
     }
     @Published var lastOutputFolder: URL?
+    /// 证件照预览。用户改一个参数就重算一次，但会防抖，并且复用同一个分析会话。
+    @Published var idPhotoPreview = IDPhotoPreview()
     /// 是否展开长尾格式。
     @Published var showsAllFormats = false
     /// 界面语言。改动会立刻生效（根视图用它的值做 id，从而重建整棵视图树）。
@@ -202,6 +221,141 @@ final class ConverterModel: ObservableObject {
         !items.isEmpty && !isConverting && !convertibleItems.isEmpty && unavailableReasons.isEmpty
     }
 
+    // MARK: - 证件照预览
+
+    private var previewTask: Task<Void, Never>?
+    private var cachedSession: (path: String, session: IDPhotoSession)?
+
+    /// 队列里第一张图片——证件照只处理图片输入。
+    var firstImageInput: URL? {
+        convertibleItems.first { $0.document.kind.isImage }?.url
+    }
+
+    /// 安排一次预览。连续调参数时只在停下来之后算一次。
+    func scheduleIDPhotoPreview() {
+        previewTask?.cancel()
+
+        if DebugLog.isEnabled {
+            DebugLog.log(
+                "preview scheduling: enabled=\(settings.idPhotoEnabled), "
+                    + "converting=\(isConverting), imageInput=\(firstImageInput?.lastPathComponent ?? "none")"
+            )
+        }
+        guard settings.idPhotoEnabled, !isConverting, let source = firstImageInput else {
+            if !idPhotoPreview.isEmpty { idPhotoPreview = IDPhotoPreview() }
+            return
+        }
+
+        let snapshot = settings
+        idPhotoPreview.isRendering = true
+        previewTask = Task { @MainActor in
+            // 防抖：拖滑块时不要每一帧都去跑 Vision
+            try? await Task.sleep(nanoseconds: 180_000_000)
+            guard !Task.isCancelled else { return }
+            await self.renderIDPhotoPreview(source: source, settings: snapshot)
+        }
+    }
+
+    private func renderIDPhotoPreview(source: URL, settings snapshot: ConversionSettings) async {
+        do {
+            let session = try await analysisSession(for: source)
+            guard !Task.isCancelled else { return }
+
+            let rendered = try await Task.detached(priority: .userInitiated) { () -> PreviewRender in
+                let outcome = try session.render(
+                    size: snapshot.idPhotoSize,
+                    background: snapshot.idPhotoBackground,
+                    dpi: snapshot.dpi,
+                    autoCrop: snapshot.idPhotoAutoCrop
+                )
+                var sheet: CGImage?
+                var sheetCount = 0
+                if snapshot.printSheetEnabled {
+                    sheet = try PhotoSheetTiler.render(
+                        photo: outcome.image,
+                        photoSize: snapshot.idPhotoSize,
+                        sheet: snapshot.printSheet,
+                        dpi: snapshot.dpi,
+                        marginMM: snapshot.printSheetMarginMM,
+                        gapMM: snapshot.printSheetGapMM,
+                        cutGuides: snapshot.printSheetCutGuides
+                    )
+                    sheetCount =
+                        PhotoSheetTiler.layout(
+                            photo: snapshot.idPhotoSize,
+                            sheet: snapshot.printSheet,
+                            marginMM: snapshot.printSheetMarginMM,
+                            gapMM: snapshot.printSheetGapMM
+                        ).count
+                }
+                return PreviewRender(
+                    photo: outcome.image,
+                    sheet: sheet,
+                    sheetCount: sheetCount,
+                    notes: outcome.notes
+                )
+            }.value
+
+            guard !Task.isCancelled else { return }
+
+            let pixels = snapshot.idPhotoSize.pixelSize(dpi: snapshot.dpi)
+            DebugLog.log(
+                "preview rendered: \(pixels.width)×\(pixels.height)px, "
+                    + "sheet=\(rendered.sheet != nil), notes=\(rendered.notes.count)"
+            )
+            idPhotoPreview = IDPhotoPreview(
+                photo: NSImage(cgImage: rendered.photo, size: .zero),
+                sheet: rendered.sheet.map { NSImage(cgImage: $0, size: .zero) },
+                caption: sheetCaption(
+                    count: rendered.sheetCount,
+                    pixels: pixels,
+                    settings: snapshot
+                ),
+                notes: rendered.notes,
+                isRendering: false,
+                failure: nil
+            )
+        } catch {
+            guard !Task.isCancelled else { return }
+            let message = (error as? ConversionError)?.message ?? error.localizedDescription
+            idPhotoPreview = IDPhotoPreview(isRendering: false, failure: message)
+        }
+    }
+
+    private struct PreviewRender: Sendable {
+        let photo: CGImage
+        let sheet: CGImage?
+        let sheetCount: Int
+        let notes: [String]
+    }
+
+    /// 同一个文件的解码与分析结果复用，换参数时不用重跑 Vision。
+    private func analysisSession(for url: URL) async throws -> IDPhotoSession {
+        if let cached = cachedSession, cached.path == url.path {
+            return cached.session
+        }
+        let created = try await Task.detached(priority: .userInitiated) {
+            try IDPhotoSession(url: url)
+        }.value
+        cachedSession = (url.path, created)
+        return created
+    }
+
+    private func sheetCaption(
+        count: Int,
+        pixels: (width: Int, height: Int),
+        settings snapshot: ConversionSettings
+    ) -> String {
+        if snapshot.printSheetEnabled {
+            return Localized.text(
+                "%d photos · %@",
+                count,
+                snapshot.printSheet.displayName
+            )
+        }
+        return "\(pixels.width) × \(pixels.height) px" + " · " + snapshot.idPhotoSize.displayName
+    }
+
     // MARK: - 预设
 
     func apply(_ preset: Preset) {
@@ -238,6 +392,7 @@ final class ConverterModel: ObservableObject {
         items.append(contentsOf: added)
         status = StatusMessage("Added %d file(s).", added.count)
         loadMetadata(for: added.map(\.id))
+        scheduleIDPhotoPreview()
     }
 
     /// 展开拖入的目录，收集支持的输入文件（含子目录）。
@@ -308,6 +463,7 @@ final class ConverterModel: ObservableObject {
                     loaded.0.pageCount > 0
                     ? .ready
                     : .failed(Localized.text("Could not read this file."))
+                self.scheduleIDPhotoPreview()
                 DebugLog.log(
                     "inspected \(url.lastPathComponent): \(loaded.0.kind.displayName), "
                         + "\(loaded.0.pageCount) page(s)/frame(s), "
@@ -319,6 +475,7 @@ final class ConverterModel: ObservableObject {
 
     func remove(id: UUID) {
         items.removeAll { $0.id == id }
+        scheduleIDPhotoPreview()
         if items.isEmpty {
             status = .idle
         }
@@ -327,6 +484,7 @@ final class ConverterModel: ObservableObject {
     func removeAll() {
         guard !isConverting else { return }
         items.removeAll()
+        scheduleIDPhotoPreview()
         overallProgress = 0
         status = .idle
     }

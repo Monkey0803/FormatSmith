@@ -308,6 +308,15 @@ struct ConversionSettingsPanel: View {
 
                 Divider().padding(.vertical, 2)
                 printSheetControls
+
+                Divider().padding(.vertical, 2)
+                if model.firstImageInput == nil {
+                    Text(Localized.text("Add a photo to see the preview."))
+                        .font(.system(size: 11))
+                        .foregroundStyle(.tertiary)
+                } else {
+                    IDPhotoPreviewView(preview: model.idPhotoPreview)
+                }
             }
         }
     }

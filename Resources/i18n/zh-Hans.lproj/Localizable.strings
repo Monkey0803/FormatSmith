@@ -17,6 +17,7 @@
 "%d page(s) · ready" = "%d 页 · 就绪";
 "%d page(s) → %d file(s)" = "%d 页 → %d 个文件";
 "%d page(s) → 1 file" = "%d 页 → 1 个文件";
+"%d photos · %@" = "%d 张 · %@";
 "%d × %d mm paper · %d photos per sheet" = "%d × %d 毫米相纸 · 每张 %d 张照片";
 "1-inch" = "一寸";
 "1-inch photo, blue background, 300 DPI" = "一寸照、蓝底、300 DPI";
@@ -31,6 +32,7 @@
 "90° counter-clockwise" = "逆时针 90°";
 "Add" = "添加";
 "Add a file to see the estimated output." = "添加文件后显示输出预估。";
+"Add a photo to see the preview." = "添加一张照片即可看到预览。";
 "Add at least two PDFs to merge; with one file this just copies it." = "至少需要两个 PDF 才能合并；只有一个文件时等同于复制。";
 "All images are merged into a single PDF." = "所有图片会合并成一个 PDF。";
 "All images into one compressed PDF" = "所有图片合并成一个压缩 PDF";
@@ -51,6 +53,7 @@
 "Clear All" = "清空列表";
 "Clear Finished" = "清除已完成";
 "Clear List" = "清空列表";
+"Click to enlarge" = "点击放大";
 "Compose around the face" = "按人脸构图";
 "Compress" = "压缩";
 "Compress embedded images (JPEG)" = "压缩内嵌图片（JPEG）";
@@ -155,7 +158,9 @@
 "Release to add" = "松开以添加";
 "Remove from list" = "从列表移除";
 "Rendering failed." = "渲染失败。";
+"Rendering preview…" = "正在生成预览…";
 "Resolution" = "输出分辨率";
+"Result" = "结果";
 "Rotate" = "旋转";
 "Scale" = "倍数";
 "Scanned PDF" = "扫描成 PDF";

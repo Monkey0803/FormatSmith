@@ -471,14 +471,8 @@ public enum ConversionEngine {
                     autoCrop: settings.idPhotoAutoCrop
                 )
                 prepared = outcome.image
-                if settings.idPhotoBackground.requiresCutout, !outcome.replacedBackground {
-                    notes.append(
-                        Localized.text("No person was detected, so the original background was kept.")
-                    )
-                }
-                if settings.idPhotoAutoCrop, !outcome.usedFace {
-                    notes.append(Localized.text("No face was detected, so the photo was centred instead."))
-                }
+                // 提示由处理器给出，预览与实际转换用的是同一套文案
+                notes.append(contentsOf: outcome.notes)
             } else {
                 let decoded = try ImageDecoder.decode(
                     url: document.url,

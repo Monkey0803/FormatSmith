@@ -33,6 +33,10 @@ in the app itself.
   with a page size that either matches the image or fits A4/Letter with a margin. Embed losslessly, or
   JPEG-compress the images to keep the file small.
 - **Images → images**: convert between formats and scale up or down (50%–400% or any custom factor).
+- **Live ID photo preview**: the settings panel shows the actual result — the cut-out subject, the
+  new background, the exact framing and the real pixel size — before you export anything. Click it to
+  enlarge. If tiling onto photo paper is on, you see the sheet too. Analysis is cached, so changing
+  the size or background updates in milliseconds.
 - **ID photos**: turn a portrait into a standard ID photo — 1-inch (25×35mm), 2-inch, passport,
   US visa and more, with a white/blue/red background. The subject is cut out with on-device person
   segmentation (macOS Vision, nothing leaves the machine) and the photo is composed around the face.
@@ -239,6 +243,10 @@ missing one fails CI rather than quietly showing English in the middle of a Chin
 Standard sizes are defined in millimetres and converted with the DPI you pick, because print shops
 cut by millimetres while files are stored in pixels. At the customary 300 DPI, 1-inch is 295×413 px
 and 2-inch is 413×579 px — the numbers you will see quoted by any ID photo service.
+
+The preview runs the same code path as the export (`IDPhotoSession`), so what you see is what you
+get — not a separate approximation. Decoding, face detection and segmentation are computed once per
+photo and reused, which is what keeps the preview responsive while you drag a slider.
 
 Cutting the subject out uses `VNGeneratePersonSegmentationRequest`, and the composition uses
 `VNDetectFaceRectanglesRequest` to place the face where the standard wants it (face width ≈ 55% of

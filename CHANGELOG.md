@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A live ID photo preview in the settings panel: it shows the real output (cut-out subject, background,
+  framing, exact pixel size) before you export, and the photo sheet when tiling is on. Click to
+  enlarge. `IDPhotoSession` caches decoding, face detection and segmentation per photo, so changing
+  size or background re-renders in milliseconds — a 12MP photo costs ~110ms once, then ~10ms per
+  change. The preview and the export share that session, so the preview cannot drift from the result.
+- The image pipeline now reports notes (for example "no person was detected, so the original
+  background was kept") on `ConversionResult`, and the preview shows the same messages.
+
 - ID photos: standard sizes (1-inch, 2-inch, ID card, passport, US visa and more) with a white, blue
   or red background. The subject is cut out with on-device person segmentation and the photo is
   composed around the detected face. The result can be tiled onto 5-inch / 6-inch photo paper with

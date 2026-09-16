@@ -90,9 +90,27 @@ public enum IDPhotoProcessor {
         public let replacedBackground: Bool
         /// 是否用了人脸来做构图。
         public let usedFace: Bool
+        /// 需要告诉用户的提示，例如「没检测到人像，已保留原背景」。
+        /// 预览与正式转换共用同一套文案，免得两处说法不一致。
+        public let notes: [String]
+
+        public init(
+            image: CGImage,
+            replacedBackground: Bool,
+            usedFace: Bool,
+            notes: [String] = []
+        ) {
+            self.image = image
+            self.replacedBackground = replacedBackground
+            self.usedFace = usedFace
+            self.notes = notes
+        }
     }
 
     /// 生成证件照。
+    ///
+    /// 只做一次转换时用这个就好；需要反复调整参数（比如界面预览）请改用 `IDPhotoSession`，
+    /// 它会把解码、人脸、遮罩缓存住，后续重算只要几毫秒。
     ///
     /// - Parameters:
     ///   - background: `.keep` 只裁剪缩放；其余颜色会先抠人像再铺底。
@@ -105,17 +123,11 @@ public enum IDPhotoProcessor {
         autoCrop: Bool = true,
         analyzer: PersonMaskProviding = VisionPersonAnalyzer()
     ) throws -> Outcome {
-        let source = try ImageDecoder.decode(url: url, scale: 1, maxPixels: 120_000_000)
-        return try makeIDPhoto(
-            from: source,
-            size: size,
-            background: background,
-            dpi: dpi,
-            autoCrop: autoCrop,
-            analyzer: analyzer
-        )
+        let session = try IDPhotoSession(url: url, analyzer: analyzer)
+        return try session.render(size: size, background: background, dpi: dpi, autoCrop: autoCrop)
     }
 
+    /// 直接用一张已经解码好的图片生成证件照（测试与已持有 CGImage 的调用方使用）。
     public static func makeIDPhoto(
         from source: CGImage,
         size: IDPhotoSize,
@@ -124,6 +136,20 @@ public enum IDPhotoProcessor {
         autoCrop: Bool = true,
         analyzer: PersonMaskProviding = VisionPersonAnalyzer()
     ) throws -> Outcome {
+        let session = IDPhotoSession(image: source, analyzer: analyzer)
+        return try session.render(size: size, background: background, dpi: dpi, autoCrop: autoCrop)
+    }
+
+    /// 真正干活的地方：人脸框与遮罩由调用方提供，便于复用与测试。
+    static func render(
+        source: CGImage,
+        size: IDPhotoSize,
+        background: IDPhotoBackground,
+        dpi: Double,
+        autoCrop: Bool,
+        faceBounds: CGRect?,
+        mask providedMask: CGImage?
+    ) throws -> Outcome {
         let pixels = size.pixelSize(dpi: dpi)
         let canvas = CGSize(width: pixels.width, height: pixels.height)
         let imageSize = CGSize(width: source.width, height: source.height)
@@ -131,10 +157,6 @@ public enum IDPhotoProcessor {
             throw ConversionError(Localized.text("This image has no pixels to work with."))
         }
 
-        var faceBounds: CGRect?
-        if autoCrop {
-            faceBounds = try? analyzer.faceBounds(in: source)
-        }
         let placement = placement(
             imageSize: imageSize,
             faceBounds: faceBounds,
@@ -142,11 +164,8 @@ public enum IDPhotoProcessor {
         )
         let usedFace = faceBounds != nil
 
-        // 要换底色就得先拿到人像遮罩；拿不到就退回「只裁剪」，绝不把整张照片涂掉。
-        var mask: CGImage?
-        if background.requiresCutout {
-            mask = try? analyzer.personMask(for: source)
-        }
+        // 要换底色才需要遮罩；拿不到就退回「整张缩放居中」，绝不把整张照片涂掉。
+        let mask = background.requiresCutout ? providedMask : nil
 
         let wantsAlpha = false
         let context = try BitmapContext.make(
@@ -171,14 +190,28 @@ public enum IDPhotoProcessor {
             context.clip(to: placement, mask: mask)
             context.draw(source, in: placement)
             context.restoreGState()
-            return Outcome(image: try makeImage(from: context), replacedBackground: true, usedFace: usedFace)
+            return Outcome(
+                image: try makeImage(from: context),
+                replacedBackground: true,
+                usedFace: usedFace,
+                notes: notesFor(usedFace: usedFace, wantsCutout: true, replacedBackground: true)
+            )
         }
 
         if background.requiresCutout {
             // 要换底色但没检测到人像：整张图缩放到画面内居中，不铺底色以外的处理
             let fitted = containRect(imageSize: imageSize, in: canvas)
             context.draw(source, in: fitted)
-            return Outcome(image: try makeImage(from: context), replacedBackground: false, usedFace: usedFace)
+            return Outcome(
+                image: try makeImage(from: context),
+                replacedBackground: false,
+                usedFace: usedFace,
+                notes: notesFor(
+                    usedFace: usedFace,
+                    wantsCutout: background.requiresCutout,
+                    replacedBackground: false
+                )
+            )
         }
 
         // 保留原背景：裁剪出算好的区域再铺满整张画布
@@ -192,7 +225,28 @@ public enum IDPhotoProcessor {
         context.draw(source, in: CGRect(origin: .zero, size: imageSize))
         context.restoreGState()
 
-        return Outcome(image: try makeImage(from: context), replacedBackground: false, usedFace: usedFace)
+        return Outcome(
+            image: try makeImage(from: context),
+            replacedBackground: false,
+            usedFace: usedFace,
+            notes: notesFor(
+                usedFace: usedFace,
+                wantsCutout: background.requiresCutout,
+                replacedBackground: false
+            )
+        )
+    }
+
+    /// 拼出要告诉用户的提示。
+    static func notesFor(usedFace: Bool, wantsCutout: Bool, replacedBackground: Bool) -> [String] {
+        var notes: [String] = []
+        if wantsCutout, !replacedBackground {
+            notes.append(Localized.text("No person was detected, so the original background was kept."))
+        }
+        if !usedFace {
+            notes.append(Localized.text("No face was detected, so the photo was centred instead."))
+        }
+        return notes
     }
 
     // MARK: - 构图
