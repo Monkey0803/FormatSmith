@@ -33,6 +33,11 @@ in the app itself.
   with a page size that either matches the image or fits A4/Letter with a margin. Embed losslessly, or
   JPEG-compress the images to keep the file small.
 - **Images → images**: convert between formats and scale up or down (50%–400% or any custom factor).
+- **ID photos**: turn a portrait into a standard ID photo — 1-inch (25×35mm), 2-inch, passport,
+  US visa and more, with a white/blue/red background. The subject is cut out with on-device person
+  segmentation (macOS Vision, nothing leaves the machine) and the photo is composed around the face.
+  You can also tile the result onto 5-inch / 6-inch photo paper, ready to print and cut.
+- **ID scans**: put the front and back of an ID card on a single A4 page (`--pdf-layout two`).
 - **PDF toolbox**: merge several PDFs, split one every N pages, extract just the pages you list,
   rotate every page by 90/180/270°, or compress by re-rasterising at a lower DPI. Compressing is
   lossy by design and the app says so before you run it.
@@ -116,6 +121,11 @@ dist/FormatSmith.app/Contents/MacOS/FormatSmith --list-formats
 | `--pdf-compress` | JPEG-compress embedded images to shrink the PDF |
 | `--merge` / `--no-merge` | Merge several images into one PDF (default: merge) |
 | `--pdf-tool <tool>` | `merge`, `split`, `extract`, `rotate`, or `compress` (PDF in, PDF out) |
+| `--id-photo <size>` | `one-inch`, `two-inch`, `id-card`, `large-one-inch`, `three-inch`, `us-visa`, … |
+| `--id-bg <colour>` | `white`, `blue`, `red`, or `keep` |
+| `--no-face-crop` | Centre the photo instead of composing around the face |
+| `--sheet <paper>` | `five-inch`, `six-inch`, or `a4` — tile the photo onto a printable sheet |
+| `--pdf-layout <n>` | `one` or `two` images per page |
 | `--split-every <n>` | Pages per file when splitting |
 | `--rotate <deg>` | `90`, `180`, or `270` |
 | `--check-dependencies` | Report whether LibreOffice and pandoc were found |
@@ -187,6 +197,10 @@ everywhere or reported as unavailable everywhere:
 | HTML / Markdown / plain text | PDF | WebKit, rendered to A4 and paginated; pandoc first for Markdown |
 | Office / HTML / Markdown | image | Rejected with an explanation — go through PDF first |
 
+With **ID photo** enabled, the image → image pipeline becomes: cut the subject out (Vision person
+segmentation) → compose around the face → fill the chosen background → optionally tile onto photo
+paper. Everything runs on-device.
+
 ## Contributing
 
 Issues and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). The short version:
@@ -220,6 +234,17 @@ missing one fails CI rather than quietly showing English in the middle of a Chin
 > source text and must not change), add the language to `AppLanguage`, and give the build script's
 > `Resources/i18n/*.lproj` glob nothing special to do — it already copies every `.lproj` it finds.
 
+## ID photos
+
+Standard sizes are defined in millimetres and converted with the DPI you pick, because print shops
+cut by millimetres while files are stored in pixels. At the customary 300 DPI, 1-inch is 295×413 px
+and 2-inch is 413×579 px — the numbers you will see quoted by any ID photo service.
+
+Cutting the subject out uses `VNGeneratePersonSegmentationRequest`, and the composition uses
+`VNDetectFaceRectanglesRequest` to place the face where the standard wants it (face width ≈ 55% of
+the frame, eye line ≈ 44% from the top). Both run locally. If no person is detected the original
+background is kept and the app says so, rather than replacing the whole photo with a flat colour.
+
 ## Known limitations
 
 - **HTML/Markdown pagination slices at block boundaries.** Long documents become proper A4 pages, and
@@ -229,6 +254,8 @@ missing one fails CI rather than quietly showing English in the middle of a Chin
   flattened. The app labels it as lossy; there is no "lossless shrink" mode.
 - **WebP and JPEG XL can be read but not written**, because macOS itself does not write them. Rather
   than bundle a third-party encoder, the app leaves them out of the output list and says why.
+- **ID photo cutouts are as good as Vision's segmentation.** Hair edges and busy backgrounds can be
+  imperfect; enable "Keep original" to crop and resize without touching the background.
 - **Office documents need LibreOffice**, which is not installed for you. (Not wired up yet.)
 - Builds are ad-hoc signed, not notarized, so the first launch needs a right-click → Open.
 

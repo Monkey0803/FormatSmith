@@ -31,6 +31,7 @@ enum CommandLineTool {
         settings.perFileSubfolder = false
 
         var index = 0
+        var dpiWasSetExplicitly = false
         func nextValue(_ flag: String) -> String? {
             guard index + 1 < arguments.count else {
                 fail("Missing value for \(flag)")
@@ -79,6 +80,7 @@ enum CommandLineTool {
                 if let value = nextValue(argument), let number = Double(value) {
                     settings.resolutionMode = .dpi
                     settings.dpi = number
+                    dpiWasSetExplicitly = true
                 }
 
             case "--scale":
@@ -139,6 +141,69 @@ enum CommandLineTool {
                     settings.target = .pdf
                     settings.pdfTool = .rotate
                     settings.rotationAngle = angle
+                }
+
+            case "--id-photo":
+                if let value = nextValue(argument) {
+                    let key = value.lowercased()
+                    guard
+                        let size = IDPhotoSize.allCases.first(where: {
+                            $0.cliName == key || $0.rawValue.lowercased() == key
+                        })
+                    else {
+                        let names = IDPhotoSize.allCases.map(\.cliName).joined(separator: ", ")
+                        fail("Unknown ID photo size: \(value). Use one of: \(names)")
+                    }
+                    settings.target = .image(settings.target.imageFormat ?? .jpeg)
+                    settings.idPhotoEnabled = true
+                    settings.idPhotoSize = size
+                    settings.resolutionMode = .dpi
+                    // 证件照的像素尺寸由毫米 × DPI 决定，用默认的 200 会得到非标准尺寸
+                    if !dpiWasSetExplicitly { settings.dpi = 300 }
+                }
+
+            case "--id-bg":
+                if let value = nextValue(argument), let background = IDPhotoBackground(rawValue: value.lowercased()) {
+                    settings.idPhotoEnabled = true
+                    settings.idPhotoBackground = background
+                } else {
+                    fail("Use --id-bg white, blue, red or keep.")
+                }
+
+            case "--no-face-crop":
+                settings.idPhotoAutoCrop = false
+
+            case "--sheet":
+                if let value = nextValue(argument),
+                    let sheet = PrintSheet.allCases.first(where: {
+                        $0.cliName == value.lowercased() || $0.rawValue.lowercased() == value.lowercased()
+                    })
+                {
+                    settings.printSheetEnabled = true
+                    settings.printSheet = sheet
+                } else {
+                    fail("Use --sheet five-inch, six-inch or a4.")
+                }
+
+            case "--sheet-gap":
+                if let value = nextValue(argument), let number = Double(value) {
+                    settings.printSheetGapMM = max(0, number)
+                }
+
+            case "--no-cut-guides":
+                settings.printSheetCutGuides = false
+
+            case "--pdf-layout":
+                if let value = nextValue(argument) {
+                    let normalized = value.lowercased()
+                    if normalized == "one" || normalized == "1" {
+                        settings.pdfLayout = .onePerPage
+                    } else if normalized == "two" || normalized == "2" {
+                        settings.pdfLayout = .twoPerPage
+                        settings.target = .pdf
+                    } else {
+                        fail("Use --pdf-layout one or two.")
+                    }
                 }
 
             case "--pdf-compress":
@@ -418,6 +483,18 @@ enum CommandLineTool {
               --split-every <n>     Pages per file when splitting (default 1)
               --rotate <deg>        90 | 180 | 270
               --pages <range>       Page range used by --pdf-tool extract
+
+            Images to PDF:
+              ID photo:
+              --id-photo <size>     \(IDPhotoSize.allCases.map(\.cliName).joined(separator: " | "))
+              --id-bg <colour>      white | blue | red | keep   (default: white)
+              --no-face-crop        Centre the photo instead of composing around the face
+              --sheet <paper>       five-inch | six-inch | a4   (tile onto photo paper)
+              --sheet-gap <mm>      Gap between photos on the sheet (default: 1)
+              --no-cut-guides       Do not draw cut guides on the sheet
+
+            PDF layout:
+              --pdf-layout <n>      one | two  (two puts two images per page, e.g. ID front and back)
 
             Images to PDF:
               --pdf-page-size <s>   fit | a4 | letter   (default: fit)

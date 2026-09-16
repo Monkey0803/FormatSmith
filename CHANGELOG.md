@@ -11,6 +11,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- ID photos: standard sizes (1-inch, 2-inch, ID card, passport, US visa and more) with a white, blue
+  or red background. The subject is cut out with on-device person segmentation and the photo is
+  composed around the detected face. The result can be tiled onto 5-inch / 6-inch photo paper with
+  optional cut guides, ready to print.
+- ID scans: `--pdf-layout two` puts two images on one page, which is what front-and-back ID scans
+  need. Available as the "ID scan" preset too.
+- Three new presets: ID photo, Photo sheet, ID scan.
+
+### Changed
+
+- Bitmaps are now created in sRGB rather than DeviceRGB. DeviceRGB follows the display, so the same
+  colour value rendered differently on different machines; ID photo backgrounds in particular have to
+  be exact. Colours are constructed in sRGB as well, instead of going through GenericRGB.
+- Turning on ID photo mode now defaults to 300 DPI. Keeping the previous 200 DPI default produced
+  197×276 px instead of the standard 295×413 px.
+
+### Fixed
+
 - A test target for the app itself (`FormatSmithAppTests`), starting with hit-area tests: they place a
   real view in a real window, dispatch real mouse events, and assert the action fires. Those tests
   fail against the previous implementation and pass against the fixed one.

@@ -23,9 +23,12 @@ struct ConversionSettingsPanel: View {
                         pdfCompressionSection
                     }
                 } else {
+                    idPhotoSection
                     qualitySection
-                    resolutionSection
-                    backgroundSection
+                    if !model.settings.idPhotoEnabled {
+                        resolutionSection
+                        backgroundSection
+                    }
                 }
                 if showPageRangeSection {
                     pageRangeSection
@@ -210,6 +213,166 @@ struct ConversionSettingsPanel: View {
                 Text(Localized.text("%@ is lossless, so the quality setting does not apply.", format.displayName))
                     .font(.system(size: 11))
                     .foregroundStyle(.tertiary)
+            }
+        }
+    }
+
+    // MARK: 证件照
+
+    private var idPhotoSection: some View {
+        SettingsCard(title: Localized.text("ID photo"), systemImage: "person.crop.rectangle") {
+            Toggle(
+                Localized.text("Make an ID photo"),
+                isOn: Binding(
+                    get: { model.settings.idPhotoEnabled },
+                    set: { enabled in
+                        model.settings.idPhotoEnabled = enabled
+                        // 证件照的像素尺寸由毫米 × DPI 决定：
+                        // 倍数缩放没有意义，而沿用默认的 200 DPI 会得到 197×276 这种非标准尺寸。
+                        if enabled {
+                            model.settings.resolutionMode = .dpi
+                            model.settings.dpi = 300
+                        }
+                    }
+                )
+            )
+            .font(.system(size: 12))
+
+            if model.settings.idPhotoEnabled {
+                Picker(
+                    "",
+                    selection: Binding(
+                        get: { model.settings.idPhotoSize },
+                        set: { model.settings.idPhotoSize = $0 }
+                    )
+                ) {
+                    ForEach(IDPhotoSize.allCases) { size in
+                        Text(size.displayName).tag(size)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+
+                Text(model.settings.idPhotoSize.summary(dpi: model.settings.dpi))
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+
+                Picker(
+                    "",
+                    selection: Binding(
+                        get: { model.settings.idPhotoBackground },
+                        set: { model.settings.idPhotoBackground = $0 }
+                    )
+                ) {
+                    ForEach(IDPhotoBackground.allCases) { background in
+                        Text(background.displayName).tag(background)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+
+                if model.settings.idPhotoBackground.requiresCutout {
+                    Text(Localized.text("The subject is cut out with on-device person segmentation."))
+                        .font(.system(size: 11))
+                        .foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Toggle(
+                    Localized.text("Compose around the face"),
+                    isOn: Binding(
+                        get: { model.settings.idPhotoAutoCrop },
+                        set: { model.settings.idPhotoAutoCrop = $0 }
+                    )
+                )
+                .font(.system(size: 12))
+
+                HStack(spacing: 8) {
+                    Text("DPI")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                    TextField(
+                        "",
+                        value: Binding(
+                            get: { model.settings.dpi },
+                            set: { model.settings.dpi = min(max($0, 72), 1200) }
+                        ), format: .number
+                    )
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 64)
+                    Text(Localized.text("300 DPI is the usual choice for printing"))
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
+                    Spacer()
+                }
+
+                Divider().padding(.vertical, 2)
+                printSheetControls
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var printSheetControls: some View {
+        let plan = PhotoSheetTiler.layout(
+            photo: model.settings.idPhotoSize,
+            sheet: model.settings.printSheet,
+            marginMM: model.settings.printSheetMarginMM,
+            gapMM: model.settings.printSheetGapMM,
+            dpi: model.settings.dpi
+        )
+
+        Toggle(
+            Localized.text("Fill a photo sheet"),
+            isOn: Binding(
+                get: { model.settings.printSheetEnabled },
+                set: { model.settings.printSheetEnabled = $0 }
+            )
+        )
+        .font(.system(size: 12))
+
+        if model.settings.printSheetEnabled {
+            Picker(
+                "",
+                selection: Binding(
+                    get: { model.settings.printSheet },
+                    set: { model.settings.printSheet = $0 }
+                )
+            ) {
+                ForEach(PrintSheet.allCases) { sheet in
+                    Text(sheet.displayName).tag(sheet)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.segmented)
+
+            Text(
+                Localized.text(
+                    "%d × %d mm paper · %d photos per sheet",
+                    Int(model.settings.printSheet.widthMM),
+                    Int(model.settings.printSheet.heightMM),
+                    plan.count
+                )
+            )
+            .font(.system(size: 11))
+            .foregroundStyle(.tertiary)
+
+            Toggle(
+                Localized.text("Cut guides"),
+                isOn: Binding(
+                    get: { model.settings.printSheetCutGuides },
+                    set: { model.settings.printSheetCutGuides = $0 }
+                )
+            )
+            .font(.system(size: 12))
+
+            if plan.count == 0 {
+                Label(
+                    Localized.text("This photo does not fit on the selected paper."),
+                    systemImage: "exclamationmark.triangle.fill"
+                )
+                .font(.system(size: 11))
+                .foregroundStyle(.orange)
             }
         }
     }
@@ -474,6 +637,25 @@ struct ConversionSettingsPanel: View {
             Picker(
                 "",
                 selection: Binding(
+                    get: { model.settings.pdfLayout },
+                    set: { model.settings.pdfLayout = $0 }
+                )
+            ) {
+                ForEach(PDFPageLayout.allCases) { layout in
+                    Text(layout.displayName).tag(layout)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.segmented)
+
+            Text(model.settings.pdfLayout.summary)
+                .font(.system(size: 11))
+                .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Picker(
+                "",
+                selection: Binding(
                     get: { model.settings.pdfPageSize },
                     set: { model.settings.pdfPageSize = $0 }
                 )
@@ -484,6 +666,14 @@ struct ConversionSettingsPanel: View {
             }
             .labelsHidden()
             .pickerStyle(.segmented)
+            .disabled(model.settings.pdfLayout == .twoPerPage)
+
+            if model.settings.pdfLayout == .twoPerPage {
+                Text(Localized.text("Two per page needs a fixed paper size, so A4 is used."))
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             if model.settings.pdfPageSize == .fitImage {
                 Text(Localized.text("Each page matches its image: 1 pixel = 1 point."))

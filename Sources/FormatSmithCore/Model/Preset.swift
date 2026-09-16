@@ -72,6 +72,55 @@ public enum PresetLibrary {
         },
 
         Preset(
+            id: "idPhoto",
+            name: Localized.text("ID photo"),
+            detail: Localized.text("1-inch photo, blue background, 300 DPI"),
+            systemImage: "person.crop.rectangle"
+        ) { settings in
+            settings.target = .image(.jpeg)
+            settings.resolutionMode = .dpi
+            settings.dpi = 300
+            settings.idPhotoEnabled = true
+            settings.idPhotoSize = .oneInch
+            settings.idPhotoBackground = .blue
+            settings.idPhotoAutoCrop = true
+            settings.printSheetEnabled = false
+        },
+
+        Preset(
+            id: "photoSheet",
+            name: Localized.text("Photo sheet"),
+            detail: Localized.text("Fill a 6-inch sheet with 1-inch photos, ready to print"),
+            systemImage: "square.grid.3x3"
+        ) { settings in
+            settings.target = .image(.jpeg)
+            settings.resolutionMode = .dpi
+            settings.dpi = 300
+            settings.idPhotoEnabled = true
+            settings.idPhotoSize = .oneInch
+            settings.idPhotoBackground = .white
+            settings.idPhotoAutoCrop = true
+            settings.printSheetEnabled = true
+            settings.printSheet = .sixInch
+            settings.printSheetCutGuides = true
+        },
+
+        Preset(
+            id: "idScan",
+            name: Localized.text("ID scan"),
+            detail: Localized.text("Front and back of an ID on one A4 page"),
+            systemImage: "creditcard"
+        ) { settings in
+            settings.target = .pdf
+            settings.pdfLayout = .twoPerPage
+            settings.pdfPageSize = .a4
+            settings.pdfMargin = 24
+            settings.pdfCompressesImages = true
+            settings.pdfImageQuality = 0.85
+            settings.mergeImagesIntoOnePDF = true
+        },
+
+        Preset(
             id: "scan",
             name: Localized.text("Scanned PDF"),
             detail: Localized.text("All images into one compressed PDF"),

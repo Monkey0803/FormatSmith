@@ -458,17 +458,53 @@ public enum ConversionEngine {
                 )
             )
 
-            let decoded = try ImageDecoder.decode(
-                url: document.url,
-                scale: settings.imageScale,
-                maxPixels: settings.maxPixels
-            )
-            // 目标格式存不了透明通道时先铺底，避免透明区域变黑。
-            let prepared = try ImageEncoder.prepare(
-                decoded,
-                for: settings.format,
-                background: settings.background
-            )
+            var notes: [String] = []
+            var prepared: CGImage
+
+            if settings.idPhotoEnabled {
+                // 证件照：尺寸与底色由证件规格决定，缩放设置不参与
+                let outcome = try IDPhotoProcessor.makeIDPhoto(
+                    from: document.url,
+                    size: settings.idPhotoSize,
+                    background: settings.idPhotoBackground,
+                    dpi: settings.dpi,
+                    autoCrop: settings.idPhotoAutoCrop
+                )
+                prepared = outcome.image
+                if settings.idPhotoBackground.requiresCutout, !outcome.replacedBackground {
+                    notes.append(
+                        Localized.text("No person was detected, so the original background was kept.")
+                    )
+                }
+                if settings.idPhotoAutoCrop, !outcome.usedFace {
+                    notes.append(Localized.text("No face was detected, so the photo was centred instead."))
+                }
+            } else {
+                let decoded = try ImageDecoder.decode(
+                    url: document.url,
+                    scale: settings.imageScale,
+                    maxPixels: settings.maxPixels
+                )
+                // 目标格式存不了透明通道时先铺底，避免透明区域变黑。
+                prepared = try ImageEncoder.prepare(
+                    decoded,
+                    for: settings.format,
+                    background: settings.background
+                )
+            }
+
+            // 相纸排版：把做好的证件照在相纸上排满
+            if settings.idPhotoEnabled, settings.printSheetEnabled {
+                prepared = try PhotoSheetTiler.render(
+                    photo: prepared,
+                    photoSize: settings.idPhotoSize,
+                    sheet: settings.printSheet,
+                    dpi: settings.dpi,
+                    marginMM: settings.printSheetMarginMM,
+                    gapMM: settings.printSheetGapMM,
+                    cutGuides: settings.printSheetCutGuides
+                )
+            }
 
             let target = try outputFolder(for: document, settings: settings)
             folder = target
@@ -498,7 +534,8 @@ public enum ConversionEngine {
                 outputFiles: written,
                 outputFolder: folder,
                 producedCount: written.count,
-                duration: Date().timeIntervalSince(started)
+                duration: Date().timeIntervalSince(started),
+                notes: notes
             )
         } catch {
             return ConversionResult(
@@ -533,14 +570,14 @@ public enum ConversionEngine {
         }
 
         do {
-            var pages: [PDFComposer.Page] = []
+            var pages: [CGImage] = []
             for (offset, document) in documents.enumerated() {
                 if cancellation.isCancelled { throw ConversionError(Localized.text("Cancelled.")) }
                 // 图片按原始像素嵌入：DPI 是给 PDF 页面用的概念，
                 // 套到图片上会让「默认 200 DPI」悄悄把照片放大 2.78 倍。
                 let image = try ImageDecoder.decode(
                     url: document.url, scale: 1, maxPixels: settings.maxPixels)
-                pages.append(PDFComposer.Page(image: image))
+                pages.append(image)
                 observer.onProgress?(
                     ConversionProgress(
                         completedUnits: offset + 1,
@@ -555,7 +592,7 @@ public enum ConversionEngine {
             let folder = try outputFolder(for: first, settings: settings)
             let fileName = mergedFileName(for: documents, settings: settings)
             let url = try PDFComposer.compose(
-                pages: pages,
+                images: pages,
                 settings: settings,
                 to: folder.appendingPathComponent(fileName),
                 cancellation: cancellation
@@ -565,7 +602,8 @@ public enum ConversionEngine {
                 documentID: primaryID,
                 outputFiles: [url],
                 outputFolder: folder,
-                producedCount: pages.count,
+                // 一页可能放两张，所以「产出页数」要按版面算
+                producedCount: settings.pdfLayout.pageCount(forImageCount: pages.count),
                 duration: Date().timeIntervalSince(started),
                 includedDocumentIDs: ids
             )

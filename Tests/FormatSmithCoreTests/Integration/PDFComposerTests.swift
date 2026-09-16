@@ -296,3 +296,122 @@ final class PDFComposerTests: XCTestCase {
     // MARK: - 工具
 
 }
+
+/// 证件扫描件用的「一页两张」版面。
+@MainActor
+final class PDFPageLayoutTests: XCTestCase {
+
+    private var directory: URL!
+    private var outputDirectory: URL!
+
+    override func setUpWithError() throws {
+        directory = try FixtureFactory.makeTemporaryDirectory()
+        outputDirectory = directory.appendingPathComponent("out", isDirectory: true)
+        try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
+    }
+
+    override func tearDownWithError() throws {
+        try? FileManager.default.removeItem(at: directory)
+    }
+
+    private func settings(layout: PDFPageLayout) -> ConversionSettings {
+        var settings = ConversionSettings()
+        settings.target = .pdf
+        settings.pdfLayout = layout
+        settings.pdfPageSize = .a4
+        settings.pdfMargin = 24
+        settings.outputDirectoryPath = outputDirectory.path
+        settings.perFileSubfolder = false
+        settings.filenamePattern = "scan"
+        return settings
+    }
+
+    private func compose(_ urls: [URL], layout: PDFPageLayout) throws -> URL {
+        let images = try urls.map { url in
+            try XCTUnwrap(CGImageSourceCreateWithURL(url as CFURL, nil))
+                .let { CGImageSourceCreateImageAtIndex($0, 0, nil) }
+        }
+        return try PDFComposer.compose(
+            images: images.compactMap { $0 },
+            settings: settings(layout: layout),
+            to: outputDirectory.appendingPathComponent("scan.pdf")
+        )
+    }
+
+    func testTwoImagesShareOnePage() throws {
+        let front = try FixtureFactory.makeImage(width: 600, height: 380, named: "front", in: directory)
+        let back = try FixtureFactory.makeImage(width: 600, height: 380, named: "back", in: directory)
+
+        let url = try compose([front, back], layout: .twoPerPage)
+        XCTAssertEqual(PDFRasterizer.pageCount(of: url), 1, "两张图应当排在同一页")
+    }
+
+    func testThreeImagesBecomeTwoPages() throws {
+        let urls = try (1...3).map {
+            try FixtureFactory.makeImage(width: 400, height: 260, named: "p\($0)", in: directory)
+        }
+        let url = try compose(urls, layout: .twoPerPage)
+        XCTAssertEqual(PDFRasterizer.pageCount(of: url), 2)
+    }
+
+    func testOnePerPageKeepsTheOldBehaviour() throws {
+        let urls = try (1...3).map {
+            try FixtureFactory.makeImage(width: 400, height: 260, named: "q\($0)", in: directory)
+        }
+        let url = try compose(urls, layout: .onePerPage)
+        XCTAssertEqual(PDFRasterizer.pageCount(of: url), 3)
+    }
+
+    func testBothImagesAreVisibleOnTheSharedPage() throws {
+        // 上红下蓝：两张图分别落在页面上半与下半
+        let red = try makeSolidImage(
+            width: 600, height: 380, colour: FixtureFactory.Palette.red, name: "red", in: directory)
+        let blue = try makeSolidImage(
+            width: 600, height: 380, colour: FixtureFactory.Palette.blue, name: "blue", in: directory)
+
+        let url = try compose([red, blue], layout: .twoPerPage)
+        let document = try XCTUnwrap(PDFRasterizer.open(url))
+        let page = try XCTUnwrap(document.page(at: 1))
+        let rendered = try PDFRasterizer.render(
+            page: page, scale: 1, background: .white, keepsAlpha: false, maxPixels: 40_000_000
+        )
+        let probe = try PixelProbe(rendered)
+
+        // 第 0 张画在上半页，第 1 张在下半页（探针 y 从上往下）
+        let upperY = rendered.height / 4
+        let lowerY = rendered.height * 3 / 4
+        XCTAssertTrue(
+            probe.pixel(x: rendered.width / 2, y: upperY).isClose(to: .red, tolerance: 45),
+            "上半页应是第一张（红），实际 \(probe.pixel(x: rendered.width / 2, y: upperY))"
+        )
+        XCTAssertTrue(
+            probe.pixel(x: rendered.width / 2, y: lowerY).isClose(to: .blue, tolerance: 45),
+            "下半页应是第二张（蓝），实际 \(probe.pixel(x: rendered.width / 2, y: lowerY))"
+        )
+    }
+
+    func testPageCountHelper() {
+        XCTAssertEqual(PDFPageLayout.onePerPage.pageCount(forImageCount: 5), 5)
+        XCTAssertEqual(PDFPageLayout.twoPerPage.pageCount(forImageCount: 5), 3)
+        XCTAssertEqual(PDFPageLayout.twoPerPage.pageCount(forImageCount: 0), 0)
+    }
+
+    private func makeSolidImage(
+        width: Int, height: Int,
+        colour: (r: Double, g: Double, b: Double),
+        name: String,
+        in directory: URL
+    ) throws -> URL {
+        let context = try BitmapContext.make(width: width, height: height, wantsAlpha: false)
+        context.setFillColor(FixtureFactory.color(colour))
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        let image = try XCTUnwrap(context.makeImage())
+        let url = directory.appendingPathComponent("\(name).png")
+        try ImageEncoder.encode(image, format: .png, quality: 1).write(to: url)
+        return url
+    }
+}
+
+private extension CGImageSource {
+    func `let`<T>(_ transform: (CGImageSource) -> T) -> T { transform(self) }
+}

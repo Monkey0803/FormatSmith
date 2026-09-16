@@ -169,6 +169,36 @@ else
     fail "batch output count: expected 10, got $BATCH_COUNT"
 fi
 
+echo "▶ ID photo…"
+OUT="$WORK/idphoto"
+"$BIN" --convert "$IMG_DIR/sample-1.png" --to jpeg --id-photo one-inch --id-bg blue \
+    --out "$OUT" --pattern "id" >/dev/null 2>&1
+expect_exit 0 $? "ID photo"
+expect_file "$OUT/id.jpg" "ID photo written"
+# 一寸 = 25×35mm，300 DPI 下就是行业通行的 295×413
+expect_size "$OUT/id.jpg" 295 413 "1-inch at 300 DPI"
+
+echo "▶ Photo sheet…"
+OUT="$WORK/sheet"
+"$BIN" --convert "$IMG_DIR/sample-1.png" --to jpeg --id-photo one-inch --id-bg white \
+    --sheet six-inch --out "$OUT" --pattern "sheet" >/dev/null 2>&1
+expect_exit 0 $? "photo sheet"
+# 6 寸 = 102×152mm，300 DPI
+expect_size "$OUT/sheet.jpg" 1205 1795 "6-inch sheet at 300 DPI"
+
+echo "▶ ID scan (two images per page)…"
+OUT="$WORK/scan"
+"$BIN" --convert "$IMG_DIR/sample-1.png" "$IMG_DIR/sample-2.png" --to pdf --pdf-layout two \
+    --out "$OUT" --pattern "scan" >/dev/null 2>&1
+expect_exit 0 $? "two images per page"
+expect_file "$OUT/scan.pdf" "scan PDF written"
+SCAN_PAGES="$(strings "$OUT/scan.pdf" | grep -c "/Type /Page[^s]")"
+if [ "$SCAN_PAGES" = "1" ]; then
+    pass "both images landed on one page"
+else
+    fail "expected 1 page in the scan PDF, found $SCAN_PAGES"
+fi
+
 echo "▶ PDF toolbox…"
 TOOLS="$WORK/tools"
 mkdir -p "$TOOLS"

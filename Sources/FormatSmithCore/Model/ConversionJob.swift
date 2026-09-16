@@ -52,6 +52,8 @@ public struct ConversionResult: Sendable {
     public let documentID: UUID
     /// 合并成一份输出时，参与的全部输入。
     public var includedDocumentIDs: [UUID] = []
+    /// 转换过程中的提示（例如「没检测到人像，已保留原背景」），供界面展示。
+    public var notes: [String] = []
     public let outputFiles: [URL]
     public let outputFolder: URL?
     /// 实际写出的张数 / 页数。
@@ -68,7 +70,8 @@ public struct ConversionResult: Sendable {
         producedCount: Int = 0,
         error: ConversionError? = nil,
         duration: TimeInterval = 0,
-        includedDocumentIDs: [UUID] = []
+        includedDocumentIDs: [UUID] = [],
+        notes: [String] = []
     ) {
         self.documentID = documentID
         self.outputFiles = outputFiles
@@ -77,6 +80,7 @@ public struct ConversionResult: Sendable {
         self.error = error
         self.duration = duration
         self.includedDocumentIDs = includedDocumentIDs.isEmpty ? [documentID] : includedDocumentIDs
+        self.notes = notes
     }
 }
 

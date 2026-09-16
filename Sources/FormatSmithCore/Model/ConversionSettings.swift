@@ -122,12 +122,30 @@ public struct ConversionSettings: Codable, Equatable, Sendable {
     /// 旋转角度。
     public var rotationAngle: RotationAngle = .clockwise90
 
+    // 证件照
+    /// 是否按证件照规格处理（尺寸、底色、按人脸构图）。
+    public var idPhotoEnabled: Bool = false
+    public var idPhotoSize: IDPhotoSize = .oneInch
+    public var idPhotoBackground: IDPhotoBackground = .white
+    /// 按人脸构图；关掉就整张图等比缩放居中。
+    public var idPhotoAutoCrop: Bool = true
+
+    // 相纸排版
+    /// 把证件照在相纸上排满，供冲印后剪开。
+    public var printSheetEnabled: Bool = false
+    public var printSheet: PrintSheet = .sixInch
+    public var printSheetMarginMM: Double = 2
+    public var printSheetGapMM: Double = 1
+    public var printSheetCutGuides: Bool = true
+
     // 图片 → PDF
     /// 多张图片是否合并成一个多页 PDF。
     public var mergeImagesIntoOnePDF: Bool = true
     public var pdfPageSize: PDFPageSize = .fitImage
     /// 页边距（点），仅在固定页面尺寸下生效。
     public var pdfMargin: Double = 24
+    /// 一页放几张图；证件扫描件常用「两张一页」。
+    public var pdfLayout: PDFPageLayout = .onePerPage
     /// 是否对嵌入 PDF 的图片做有损压缩；默认保留原始画质。
     public var pdfCompressesImages: Bool = false
     public var pdfImageQuality: Double = 0.85
