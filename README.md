@@ -256,6 +256,12 @@ Cutting the subject out uses `VNGeneratePersonSegmentationRequest`, and the comp
 the frame, eye line ≈ 44% from the top). Both run locally. If no person is detected the original
 background is kept and the app says so, rather than replacing the whole photo with a flat colour.
 
+That last part is subtler than it looks: `VNGeneratePersonSegmentationRequest` returns a mask even when
+it finds nothing, so "is there a mask?" is the wrong question — an all-black mask (measured at 0%
+foreground) means the same as no mask. Treating it as a successful cut-out erased the photo and filled
+the page with the background colour. Coverage is checked instead, with anything below 0.5% treated as
+"no subject".
+
 ## Putting an ID card on one page
 
 Three ways, all producing the same A4 page with the front on top and the back below:

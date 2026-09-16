@@ -113,6 +113,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Converting an image to PDF could come out as a solid blue page with the photo gone.** Vision's
+  person segmentation returns a mask even when it finds nobody — an essentially black one (measured:
+  0% foreground) — and the code only checked whether a mask *existed*, so it clipped everything away
+  and filled the frame with the chosen background colour while reporting success. A mask with
+  negligible coverage is now treated as "no person": the photo is kept, drawn to fit, and the app says
+  so. Regression tests cover the empty mask, stray specks, and a real Vision run.
+- The ID photo controls were hidden when the output was PDF, even though the settings still applied —
+  so a background colour chosen earlier could tint a PDF with no way to see or change it. The ID photo
+  card is now shown for PDF output too (the photo-sheet options, which produce an image, are not).
+- `--id-photo` no longer overrides `--to pdf`; it used to silently turn the target back into a JPEG.
+
 - Choosing "Two per page" now switches the paper setting to A4 instead of leaving the picker showing
   "Match image" while the output was A4 anyway.
 - **"This resolution is over the safety limit" was reported for jobs that were nowhere near it.**

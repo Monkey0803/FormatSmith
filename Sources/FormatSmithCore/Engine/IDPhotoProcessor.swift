@@ -84,6 +84,13 @@ public enum IDPhotoProcessor {
     /// 人脸中心距顶部的比例。留出头顶空间，不至于「顶天」。
     static let faceCenterYRatio = 0.44
 
+    /// 遮罩里至少有这个比例才算「找到了人」。
+    ///
+    /// Vision 在找不到人时**仍然会返回一张遮罩**，只是一张几乎全黑的图
+    /// （实测最大亮度 5、前景 0%）。只判断「有没有遮罩」会把整张照片裁掉，
+    /// 输出变成一块纯底色 —— 这就是「转 PDF 多了一层蓝色」的真正原因。
+    static let minimumPersonCoverage = 0.005
+
     public struct Outcome: Sendable {
         public let image: CGImage
         /// 是否真的换了底色（没检测到人像时为 false）。
@@ -164,8 +171,9 @@ public enum IDPhotoProcessor {
         )
         let usedFace = faceBounds != nil
 
-        // 要换底色才需要遮罩；拿不到就退回「整张缩放居中」，绝不把整张照片涂掉。
-        let mask = background.requiresCutout ? providedMask : nil
+        // 要换底色才需要遮罩；拿不到、或者遮罩里根本没有主体，
+        // 都退回「整张缩放居中」，绝不把整张照片涂掉。
+        let mask = background.requiresCutout ? usableMask(from: providedMask) : nil
 
         let wantsAlpha = false
         let context = try BitmapContext.make(
@@ -235,6 +243,37 @@ public enum IDPhotoProcessor {
                 replacedBackground: false
             )
         )
+    }
+
+    /// 过滤掉「有遮罩但里面没有人」的情况。
+    static func usableMask(from mask: CGImage?) -> CGImage? {
+        guard let mask else { return nil }
+        return coverage(of: mask) >= minimumPersonCoverage ? mask : nil
+    }
+
+    /// 遮罩里前景（人像）所占的比例。
+    ///
+    /// 缩到小块再统计：只需要判断「有没有人」，不必读全分辨率。
+    static func coverage(of mask: CGImage) -> Double {
+        let width = 64
+        let height = max(1, Int((Double(mask.height) / Double(max(mask.width, 1)) * 64).rounded()))
+        var bytes = [UInt8](repeating: 0, count: width * height)
+        guard
+            let context = CGContext(
+                data: &bytes,
+                width: width,
+                height: height,
+                bitsPerComponent: 8,
+                bytesPerRow: width,
+                space: CGColorSpaceCreateDeviceGray(),
+                bitmapInfo: CGImageAlphaInfo.none.rawValue
+            )
+        else { return 0 }
+
+        context.interpolationQuality = .low
+        context.draw(mask, in: CGRect(x: 0, y: 0, width: width, height: height))
+        let foreground = bytes.reduce(0) { $0 + ($1 >= 128 ? 1 : 0) }
+        return Double(foreground) / Double(width * height)
     }
 
     /// 拼出要告诉用户的提示。

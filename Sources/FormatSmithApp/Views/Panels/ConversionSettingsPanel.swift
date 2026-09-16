@@ -19,6 +19,9 @@ struct ConversionSettingsPanel: View {
                         pdfToolSection
                     }
                     if model.hasImageInputs {
+                        // 证件照设置对「图片 → PDF」同样生效，所以也要显示出来——
+                        // 否则用户看不到它开着，只会看到输出多了一层底色。
+                        idPhotoSection
                         pdfLayoutSection
                         pdfCompressionSection
                     }
@@ -306,8 +309,11 @@ struct ConversionSettingsPanel: View {
                     Spacer()
                 }
 
-                Divider().padding(.vertical, 2)
-                printSheetControls
+                if !model.target.isPDF {
+                    // 相纸排版产出的是图片，PDF 目标下用不上
+                    Divider().padding(.vertical, 2)
+                    printSheetControls
+                }
 
                 Divider().padding(.vertical, 2)
                 if model.firstImageInput == nil {

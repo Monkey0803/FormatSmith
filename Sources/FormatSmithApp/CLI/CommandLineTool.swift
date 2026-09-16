@@ -156,7 +156,8 @@ enum CommandLineTool {
                         let names = IDPhotoSize.allCases.map(\.cliName).joined(separator: ", ")
                         fail("Unknown ID photo size: \(value). Use one of: \(names)")
                     }
-                    settings.target = .image(settings.target.imageFormat ?? .jpeg)
+                    // 只打开证件照模式，不要动输出目标。
+                    // 之前这里会把目标强行改成图片，导致 --to pdf --id-photo 变成 JPEG。
                     settings.idPhotoEnabled = true
                     settings.idPhotoSize = size
                     settings.resolutionMode = .dpi

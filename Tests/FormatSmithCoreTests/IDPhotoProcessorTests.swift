@@ -390,3 +390,134 @@ final class IDPhotoSessionTests: XCTestCase {
         XCTAssertEqual(session.sourceSize, CGSize(width: 300, height: 400))
     }
 }
+
+/// 「有遮罩但里面没有人」的处理。
+///
+/// 这一组直接对应一个真实故障：把一张普通照片当证件照转成 PDF，结果是**整页纯蓝、照片消失**。
+/// 原因是 Vision 找不到人时仍然返回一张全黑遮罩，代码只判断「有没有遮罩」，
+/// 于是把人像以外的一切都裁掉了。
+final class EmptyPersonMaskTests: XCTestCase {
+
+    private func makeSource(width: Int = 400, height: Int = 300) throws -> CGImage {
+        let context = try BitmapContext.make(width: width, height: height, wantsAlpha: false)
+        context.setFillColor(FixtureFactory.color(FixtureFactory.Palette.red))
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        return try XCTUnwrap(context.makeImage())
+    }
+
+    private func makeMask(width: Int = 400, height: Int = 300, value: (Int, Int) -> UInt8) throws -> CGImage {
+        var bytes = [UInt8](repeating: 0, count: width * height)
+        for y in 0..<height {
+            for x in 0..<width { bytes[y * width + x] = value(x, y) }
+        }
+        let provider = try XCTUnwrap(CGDataProvider(data: Data(bytes) as CFData))
+        return try XCTUnwrap(
+            CGImage(
+                width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 8,
+                bytesPerRow: width, space: CGColorSpaceCreateDeviceGray(),
+                bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue),
+                provider: provider, decode: nil, shouldInterpolate: true, intent: .defaultIntent
+            )
+        )
+    }
+
+    // MARK: - 覆盖率判定
+
+    func testCoverageOfAFullyBlackMaskIsZero() throws {
+        let mask = try makeMask { _, _ in 0 }
+        XCTAssertEqual(IDPhotoProcessor.coverage(of: mask), 0, accuracy: 0.001)
+        XCTAssertNil(IDPhotoProcessor.usableMask(from: mask), "全黑遮罩应当被当成「没找到人」")
+    }
+
+    func testCoverageOfAFullyWhiteMaskIsOne() throws {
+        let mask = try makeMask { _, _ in 255 }
+        XCTAssertEqual(IDPhotoProcessor.coverage(of: mask), 1, accuracy: 0.01)
+        XCTAssertNotNil(IDPhotoProcessor.usableMask(from: mask))
+    }
+
+    func testTinyStraySpecksAreNotAPerson() throws {
+        // 只有左上角几个像素是白的：当成没人，别为了几个噪点把整张图裁掉
+        let mask = try makeMask { x, y in (x < 3 && y < 3) ? 255 : 0 }
+        XCTAssertLessThan(IDPhotoProcessor.coverage(of: mask), IDPhotoProcessor.minimumPersonCoverage)
+        XCTAssertNil(IDPhotoProcessor.usableMask(from: mask))
+    }
+
+    func testNilMaskStaysNil() {
+        XCTAssertNil(IDPhotoProcessor.usableMask(from: nil))
+    }
+
+    // MARK: - 空遮罩不能吃掉照片
+
+    func testEmptyMaskKeepsThePhotoInsteadOfFillingWithTheBackground() throws {
+        let emptyMask = try makeMask { _, _ in 0 }
+        let outcome = try IDPhotoProcessor.makeIDPhoto(
+            from: try makeSource(),
+            size: .oneInch,
+            background: .blue,
+            dpi: 300,
+            autoCrop: false,
+            analyzer: FixedAnalyzer(mask: emptyMask, face: nil)
+        )
+
+        XCTAssertFalse(outcome.replacedBackground, "根本没抠出人来，不该声称换过底色")
+        XCTAssertTrue(
+            outcome.notes.contains { $0.contains("person") || $0.contains("人像") },
+            "应当提示用户没检测到人像，实际提示：\(outcome.notes)"
+        )
+
+        // 画面中间必须还是原照片，而不是一片底色
+        let probe = try PixelProbe(outcome.image)
+        let centre = probe.pixel(x: outcome.image.width / 2, y: outcome.image.height / 2)
+        XCTAssertTrue(centre.isClose(to: .red, tolerance: 40), "中间应当还是照片，实际 \(centre)")
+    }
+
+    func testEmptyMaskDoesNotLeaveTheWholePageInTheBackgroundColour() throws {
+        // 这是「转 PDF 多了一层蓝色」的直接复现：整页都是底色就说明照片被裁没了
+        let emptyMask = try makeMask { _, _ in 0 }
+        let outcome = try IDPhotoProcessor.makeIDPhoto(
+            from: try makeSource(),
+            size: .oneInch,
+            background: .blue,
+            dpi: 300,
+            autoCrop: false,
+            analyzer: FixedAnalyzer(mask: emptyMask, face: nil)
+        )
+
+        let probe = try PixelProbe(outcome.image)
+        var photoPixels = 0
+        for y in stride(from: 0, to: outcome.image.height, by: 3) {
+            for x in stride(from: 0, to: outcome.image.width, by: 3) {
+                if probe.pixel(x: x, y: y).isClose(to: .red, tolerance: 45) { photoPixels += 1 }
+            }
+        }
+        XCTAssertGreaterThan(photoPixels, 500, "照片应当大面积保留，实际只有 \(photoPixels) 个采样点是照片")
+    }
+
+    func testRealVisionRunWithNoPersonKeepsThePhoto() throws {
+        // 真跑一次 Vision：这才是最初出问题的路径（注入的遮罩都「有内容」，测不到这一条）。
+        // 用纯蓝图：Vision 对它返回全黑遮罩（实测前景 0%），
+        // 而纯红会被误判成人像（前景 8.5%、置信度 250），不适合做这个断言。
+        let context = try BitmapContext.make(width: 600, height: 400, wantsAlpha: false)
+        context.setFillColor(FixtureFactory.color(FixtureFactory.Palette.blue))
+        context.fill(CGRect(x: 0, y: 0, width: 600, height: 400))
+        let source = try XCTUnwrap(context.makeImage())
+
+        let outcome = try IDPhotoProcessor.makeIDPhoto(
+            from: source,
+            size: .oneInch,
+            background: .red,
+            dpi: 300,
+            autoCrop: false
+        )
+
+        XCTAssertFalse(outcome.replacedBackground, "没有检测到人，不该声称换过底色")
+        XCTAssertTrue(
+            outcome.notes.contains { $0.contains("person") || $0.contains("人像") },
+            "应当提示没检测到人像，实际：\(outcome.notes)"
+        )
+
+        let probe = try PixelProbe(outcome.image)
+        let centre = probe.pixel(x: outcome.image.width / 2, y: outcome.image.height / 2)
+        XCTAssertTrue(centre.isClose(to: .blue, tolerance: 45), "原图必须留下来，实际 \(centre)")
+    }
+}
