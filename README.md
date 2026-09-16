@@ -18,7 +18,8 @@ in the app itself.
   are found for you), or use *Open With → FormatSmith*.
 - **Seven output formats** by default — PNG, JPEG, HEIC, AVIF, TIFF, GIF, BMP — plus the long tail
   (JPEG 2000, Photoshop, Targa, OpenEXR, PBM, Windows Icon) behind one switch.
-- **HD or print resolution**: pick a DPI (72–600) or a scale factor (1×–4×).
+- **Resolution that means what it says**: PDFs render at a chosen DPI (72–600); images scale from
+  their own pixels (1× = original). Enlarging an image is something you opt into, never a default.
 - **Backgrounds**: white, black, or transparent (transparency only where the format can store it).
 - **Page ranges**: all pages, or something like `1-3,5,8-10`.
 - **Naming you control**: `{name}`, `{page}`, `{total}`, `{date}`, `{time}`, per-file subfolders,
@@ -114,7 +115,7 @@ dist/FormatSmith.app/Contents/MacOS/FormatSmith --list-formats
 | `--to <target>` | An image format (`png`, `jpeg`, `heic`, …) or `pdf` (default `png`) |
 | `--format <name>` | Alias of `--to` |
 | `--quality <0.05-1>` | Quality for lossy formats (default `0.9`) |
-| `--dpi <n>` / `--scale <n>` | Resolution (default `200` DPI) |
+| `--dpi <n>` / `--scale <n>` | `--dpi` for PDF input (default 200); `--scale` for image input (1 = original) |
 | `--pages <range>` | e.g. `1-3,5,8-10` (default: all) |
 | `--out <dir>` | Output directory (default: current directory) |
 | `--pattern <template>` | File name template using `{name}` `{page}` `{total}` `{date}` `{time}` |
@@ -252,6 +253,19 @@ Cutting the subject out uses `VNGeneratePersonSegmentationRequest`, and the comp
 `VNDetectFaceRectanglesRequest` to place the face where the standard wants it (face width ≈ 55% of
 the frame, eye line ≈ 44% from the top). Both run locally. If no person is detected the original
 background is kept and the app says so, rather than replacing the whole photo with a flat colour.
+
+## Why there is a pixel limit
+
+Every output image is held in memory as 8-bit RGBA, so 120 megapixels is roughly a 480 MB buffer
+before the source image is counted. A project that produces larger images on purpose should change
+`ConversionSettings.maxPixels`; the app reports the actual numbers rather than a vague warning.
+
+Getting the estimate right matters, and it used to be wrong in two ways. Turning on ID photo mode
+(which sets 300 DPI) kept estimating "input size × scale" — a 12 MP photo became 212 MP on paper and
+the app refused a job whose real output was 295×413. And for images, DPI was being used as a
+magnification factor (200 DPI = 2.78×), so a 48 MP phone photo tripped the limit under the *default*
+settings. The estimate is now per-pipeline: ID photos and photo sheets report their spec size, images
+report pixels × scale, PDFs report points × DPI.
 
 ## Known limitations
 

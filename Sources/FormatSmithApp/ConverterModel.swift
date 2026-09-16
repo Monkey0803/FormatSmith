@@ -182,6 +182,26 @@ final class ConverterModel: ObservableObject {
         ToolLocator.all().filter(\.isAvailable)
     }
 
+    /// 首张图的输出像素估算。证件照与相纸排版按规格算，其余按缩放算。
+    var outputEstimate: (width: Int, height: Int)? {
+        guard let first = items.first(where: { $0.document.size.width > 0 }) else { return nil }
+        let info = DocumentInfo(
+            kind: first.document.kind,
+            pageCount: first.document.pageCount,
+            displaySize: first.document.size
+        )
+        return settings.estimatedPixelSize(for: info)
+    }
+
+    /// 当前参数会不会因为像素数过高而被拒绝。
+    var estimateExceedsLimit: Bool {
+        guard let estimate = outputEstimate else { return false }
+        return estimate.width * estimate.height > settings.maxPixels
+    }
+
+    /// 这台文件的输出像素上限（百万像素），用于提示文案。
+    var maxMegapixels: Int { settings.maxPixels / 1_000_000 }
+
     /// 这批文件会走哪条管线。
     var plannedKind: ConversionPlan.Kind? {
         let kinds = queueKinds

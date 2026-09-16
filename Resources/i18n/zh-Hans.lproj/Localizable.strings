@@ -11,6 +11,7 @@
 "%@ · %d × %d px" = "%@ · %d × %d 像素";
 "%@ · ready" = "%@ · 就绪";
 "%d image(s) · %@" = "%d 张图片 · %@";
+"%d megapixels is over the %d megapixel safety limit — lower the DPI or scale." = "%d 百万像素，超过 %d 百万像素的安全上限，请降低 DPI 或倍数。";
 "%d of %d page(s)" = "共 %d 页中的 %d 页";
 "%d page(s)" = "%d 页";
 "%d page(s) at %d DPI" = "%d 页 · %d DPI";
@@ -101,6 +102,7 @@
 "ID scan" = "证件扫描件";
 "Images" = "图片";
 "Images are embedded losslessly, so the PDF can be large." = "图片以无损方式嵌入，PDF 可能较大。";
+"Images are scaled from their own pixels: 1× keeps the original size." = "图片按自身像素缩放，1× 即原始尺寸。";
 "Images are scaled to fit and centered on the page." = "图片等比缩放后居中放置。";
 "Install it with Homebrew, or download it from libreoffice.org." = "可以用 Homebrew 安装，也可以从 libreoffice.org 下载。";
 "Install it with Homebrew. Markdown still converts without it, using the built-in renderer." = "可以用 Homebrew 安装；没装时 Markdown 仍会用内置渲染器转换。";
@@ -189,7 +191,6 @@
 "This page has an invalid size." = "页面尺寸异常。";
 "This photo does not fit on the selected paper." = "这张照片放不进所选的相纸。";
 "This photo is too small for the selected size." = "这张照片分辨率太低，不足以输出该规格。";
-"This resolution is over the safety limit and will be rejected." = "该分辨率超过安全上限，转换时会被拒绝。";
 "Transparent" = "透明";
 "Turn every page by a fixed angle." = "把所有页面旋转固定角度。";
 "Two images stacked on one page — handy for ID scans." = "两张图上下排在同一页，适合身份证正反面这类扫描件。";

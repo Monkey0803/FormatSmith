@@ -91,7 +91,7 @@ public struct ConversionSettings: Codable, Equatable, Sendable {
     // 分辨率
     public var resolutionMode: ResolutionMode = .dpi
     public var dpi: Double = 200
-    public var scale: Double = 2
+    public var scale: Double = 1
 
     // 背景
     public var background: ImageBackground = .white
@@ -170,12 +170,44 @@ public struct ConversionSettings: Codable, Equatable, Sendable {
 
     /// 图片输入使用的缩放系数。
     ///
-    /// DPI 对图片没有天然含义，这里沿用 PDF 的约定：72 DPI 即原始像素尺寸。
+    /// 只看 `scale`，**不再把 DPI 当成放大倍数**。
+    /// 之前沿用了 PDF 的 72 DPI 约定，于是默认的 200 DPI 会把图片放大 2.78 倍 ——
+    /// 一张 4800 万像素的手机照片会瞬间变成 3.76 亿像素，直接撞上安全上限。
+    /// 图片本来就有自己的像素尺寸，放大只在用户明确要求时才做。
     public var imageScale: Double {
-        switch resolutionMode {
-        case .scale: return max(0.05, scale)
-        case .dpi: return max(0.05, dpi / 72.0)
+        max(0.05, scale)
+    }
+
+    /// 按输出目标估算首张图的像素尺寸。
+    ///
+    /// 每条链路都要如实反映：证件照与相纸排版的尺寸由规格决定，
+    /// 而不是「输入尺寸 × 缩放」——这正是之前误报「超过安全上限」的原因。
+    public func estimatedPixelSize(for info: DocumentInfo) -> (width: Int, height: Int)? {
+        switch info.kind {
+        case .image:
+            if idPhotoEnabled {
+                if printSheetEnabled { return printSheet.pixelSize(dpi: dpi) }
+                return idPhotoSize.pixelSize(dpi: dpi)
+            }
+            return Self.scaled(info.displaySize, by: imageScale)
+        case .pdf:
+            return Self.scaled(info.displaySize, by: effectiveScale)
+        default:
+            return nil
         }
+    }
+
+    /// 估算值是否超出安全上限（超过就说明这个参数组合会被拒绝）。
+    public func estimateExceedsLimit(for info: DocumentInfo) -> Bool {
+        guard let pixels = estimatedPixelSize(for: info) else { return false }
+        return pixels.width * pixels.height > maxPixels
+    }
+
+    private static func scaled(_ size: CGSize, by scale: Double) -> (width: Int, height: Int) {
+        (
+            max(Int((size.width * scale).rounded()), 1),
+            max(Int((size.height * scale).rounded()), 1)
+        )
     }
 
     /// 渲染时使用的缩放系数（相对 PDF 的 72pt/inch）。

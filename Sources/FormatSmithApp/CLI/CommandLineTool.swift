@@ -32,6 +32,7 @@ enum CommandLineTool {
 
         var index = 0
         var dpiWasSetExplicitly = false
+        var scaleWasSetExplicitly = false
         func nextValue(_ flag: String) -> String? {
             guard index + 1 < arguments.count else {
                 fail("Missing value for \(flag)")
@@ -87,6 +88,7 @@ enum CommandLineTool {
                 if let value = nextValue(argument), let number = Double(value) {
                     settings.resolutionMode = .scale
                     settings.scale = number
+                    scaleWasSetExplicitly = true
                 }
 
             case "--pages":
@@ -291,6 +293,16 @@ enum CommandLineTool {
             return failures == 0 ? 2 : 1
         }
 
+        // DPI 是页面的概念：只对 PDF 有效。图片用的是倍数，别让它被静默忽略。
+        if dpiWasSetExplicitly, !scaleWasSetExplicitly,
+            documents.allSatisfy({ $0.kind.isImage }), !settings.idPhotoEnabled
+        {
+            FileHandle.standardError.write(
+                "note: --dpi only affects PDF input; use --scale for images (1 = original size).\n"
+                    .data(using: .utf8)!
+            )
+        }
+
         let strategy = ConversionRouter.strategy(
             inputs: documents.map(\.kind),
             target: settings.target,
@@ -471,8 +483,9 @@ enum CommandLineTool {
 
             Options:
               --quality <0.05-1>    Quality for lossy formats (default 0.9)
-              --dpi <number>        Render PDFs at this DPI (default 200); 72 = original size for images
-              --scale <number>      Scale factor instead of DPI, e.g. 2 for 200%
+              --dpi <number>        Render PDFs at this DPI (default 200). PDF input only
+              --scale <number>      Output size factor for images: 1 = original, 2 = 200%
+                                    (for PDF input this is an alternative to --dpi)
               --pages <range>       PDF page range such as 1-3,5,8-10 (default: all)
               --out <dir>           Output directory (default: current directory)
               --pattern <template>  {name} {page} {total} {date} {time}

@@ -30,6 +30,8 @@ public enum PresetLibrary {
             settings.target = .image(.png)
             settings.resolutionMode = .dpi
             settings.dpi = 144
+            // 图片看的是 scale，PDF 看的是 dpi —— 两条都要交代清楚
+            settings.scale = 2
             settings.background = .transparent
         },
 
@@ -42,6 +44,7 @@ public enum PresetLibrary {
             settings.target = .image(.jpeg)
             settings.resolutionMode = .dpi
             settings.dpi = 120
+            settings.scale = 1
             settings.quality = 0.75
             settings.background = .white
         },
@@ -55,6 +58,7 @@ public enum PresetLibrary {
             settings.target = .image(.tiff)
             settings.resolutionMode = .dpi
             settings.dpi = 300
+            settings.scale = 1
             settings.background = .white
         },
 
@@ -68,6 +72,7 @@ public enum PresetLibrary {
             settings.resolutionMode = .dpi
             // 72 DPI 对 PDF 是原始尺寸，对图片是原始像素
             settings.dpi = 72
+            settings.scale = 1
             settings.background = .white
         },
 
@@ -80,6 +85,7 @@ public enum PresetLibrary {
             settings.target = .image(.jpeg)
             settings.resolutionMode = .dpi
             settings.dpi = 300
+            settings.scale = 1
             settings.idPhotoEnabled = true
             settings.idPhotoSize = .oneInch
             settings.idPhotoBackground = .blue
@@ -96,6 +102,7 @@ public enum PresetLibrary {
             settings.target = .image(.jpeg)
             settings.resolutionMode = .dpi
             settings.dpi = 300
+            settings.scale = 1
             settings.idPhotoEnabled = true
             settings.idPhotoSize = .oneInch
             settings.idPhotoBackground = .white

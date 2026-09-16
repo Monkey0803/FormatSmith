@@ -389,21 +389,25 @@ struct ConversionSettingsPanel: View {
 
     private var resolutionSection: some View {
         SettingsCard(title: Localized.text("Resolution"), systemImage: "arrow.up.left.and.arrow.down.right") {
-            Picker(
-                "",
-                selection: Binding(
-                    get: { model.settings.resolutionMode },
-                    set: { model.settings.resolutionMode = $0 }
-                )
-            ) {
-                ForEach(ResolutionMode.allCases) { mode in
-                    Text(mode.displayName).tag(mode)
+            // DPI 是页面的概念：只有队列里有 PDF 时才显示。
+            // 图片本来就有确定的像素尺寸，用「倍数」表达才不会把默认值变成放大。
+            if model.hasPDFInputs {
+                Picker(
+                    "",
+                    selection: Binding(
+                        get: { model.settings.resolutionMode },
+                        set: { model.settings.resolutionMode = $0 }
+                    )
+                ) {
+                    ForEach(ResolutionMode.allCases) { mode in
+                        Text(mode.displayName).tag(mode)
+                    }
                 }
+                .labelsHidden()
+                .pickerStyle(.segmented)
             }
-            .labelsHidden()
-            .pickerStyle(.segmented)
 
-            if model.settings.resolutionMode == .dpi {
+            if model.hasPDFInputs, model.settings.resolutionMode == .dpi {
                 PresetChipRow(
                     values: [72, 150, 200, 300, 600],
                     selected: model.settings.dpi,
@@ -438,6 +442,13 @@ struct ConversionSettingsPanel: View {
                     selected: model.settings.scale,
                     label: { $0 < 1 ? "\(Int($0 * 100))%" : "\(Int($0))×" }
                 ) { model.settings.scale = $0 }
+
+                if model.hasImageInputs {
+                    Text(Localized.text("Images are scaled from their own pixels: 1× keeps the original size."))
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
     }
@@ -889,11 +900,12 @@ struct ConversionSettingsPanel: View {
                         previewRow(Localized.text("First file"), Localized.text("%d page(s)", pagesForPreview))
                         previewRow(Localized.text("Example name"), examplePDFName(for: first), monospaced: true)
                     } else {
-                        let size = first.document.size
-                        let scale = effectiveScale(for: first)
-                        let width = Int((size.width * scale).rounded())
-                        let height = Int((size.height * scale).rounded())
-                        previewRow(Localized.text("Each image"), "\(width) × \(height) px")
+                        if let estimate = model.outputEstimate {
+                            previewRow(
+                                Localized.text("Each image"),
+                                "\(estimate.width) × \(estimate.height) px"
+                            )
+                        }
                         previewRow(
                             Localized.text("First file"),
                             Localized.text(
@@ -904,13 +916,19 @@ struct ConversionSettingsPanel: View {
                         )
                         previewRow(Localized.text("Example name"), exampleImageName(for: first), monospaced: true)
 
-                        if Double(width * height) > Double(model.settings.maxPixels) {
+                        if model.estimateExceedsLimit, let estimate = model.outputEstimate {
+                            let megapixels = estimate.width * estimate.height / 1_000_000
                             Label(
-                                Localized.text("This resolution is over the safety limit and will be rejected."),
+                                Localized.text(
+                                    "%d megapixels is over the %d megapixel safety limit — lower the DPI or scale.",
+                                    megapixels,
+                                    model.maxMegapixels
+                                ),
                                 systemImage: "exclamationmark.triangle.fill"
                             )
                             .font(.system(size: 11))
                             .foregroundStyle(.orange)
+                            .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                 }
@@ -942,13 +960,6 @@ struct ConversionSettingsPanel: View {
         }
     }
 
-    private func effectiveScale(for item: QueueItem) -> Double {
-        if item.document.kind.isImage, !model.hasPDFInputs {
-            return model.settings.imageScale
-        }
-        return model.settings.effectiveScale
-    }
-
     private var pagesForPreview: Int {
         guard let first = model.items.first(where: { $0.document.pageCount > 0 }) else { return 0 }
         if first.document.kind.isImage {
@@ -960,7 +971,7 @@ struct ConversionSettingsPanel: View {
     private func pdfPageDescription(for item: QueueItem) -> String {
         switch model.settings.pdfPageSize {
         case .fitImage:
-            let scale = effectiveScale(for: item)
+            let scale = model.settings.imageScale
             let width = Int((item.document.size.width * scale).rounded())
             let height = Int((item.document.size.height * scale).rounded())
             return "\(width) × \(height) pt"

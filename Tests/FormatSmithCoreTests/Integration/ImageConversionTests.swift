@@ -102,10 +102,14 @@ final class ImageConversionTests: XCTestCase {
         XCTAssertEqual(small.height, 40)
     }
 
-    func testDPIModeTreats72AsOriginalSizeForImages() throws {
+    func testDPIDoesNotMagnifyImages() throws {
+        // 曾经把 DPI 当作图片的放大倍数（144 DPI = 2×），
+        // 结果默认的 200 DPI 会把照片放大 2.78 倍，手机原图直接撞上像素上限。
+        // 图片有自己的像素尺寸，放大必须由用户显式选择倍数。
         var settings = settings(format: .png)
         settings.resolutionMode = .dpi
         settings.dpi = 144
+        settings.scale = 1
         settings.filenamePattern = "dpi"
 
         let result = convert(
@@ -114,7 +118,23 @@ final class ImageConversionTests: XCTestCase {
         )
         let source = try XCTUnwrap(CGImageSourceCreateWithURL(try XCTUnwrap(result.outputFiles.first) as CFURL, nil))
         let image = try XCTUnwrap(CGImageSourceCreateImageAtIndex(source, 0, nil))
-        XCTAssertEqual(image.width, 200, "144 DPI 对图片应等价于 2 倍")
+        XCTAssertEqual(image.width, 100, "DPI 不该改变图片的输出尺寸")
+        XCTAssertEqual(image.height, 50)
+    }
+
+    func testScaleMagnifiesImagesWhenAskedExplicitly() throws {
+        var settings = settings(format: .png)
+        settings.scale = 2
+        settings.resolutionMode = .scale
+        settings.filenamePattern = "twice"
+
+        let result = convert(
+            try FixtureFactory.makeImage(width: 100, height: 50, format: .png, named: "src", in: directory),
+            settings
+        )
+        let source = try XCTUnwrap(CGImageSourceCreateWithURL(try XCTUnwrap(result.outputFiles.first) as CFURL, nil))
+        let image = try XCTUnwrap(CGImageSourceCreateImageAtIndex(source, 0, nil))
+        XCTAssertEqual(image.width, 200, "显式选了 2× 才放大")
         XCTAssertEqual(image.height, 100)
     }
 

@@ -567,10 +567,25 @@ public enum ConversionEngine {
             var pages: [CGImage] = []
             for (offset, document) in documents.enumerated() {
                 if cancellation.isCancelled { throw ConversionError(Localized.text("Cancelled.")) }
-                // 图片按原始像素嵌入：DPI 是给 PDF 页面用的概念，
-                // 套到图片上会让「默认 200 DPI」悄悄把照片放大 2.78 倍。
-                let image = try ImageDecoder.decode(
-                    url: document.url, scale: 1, maxPixels: settings.maxPixels)
+                // 证件照模式下先按规格出图，再嵌进 PDF —— 否则「证件照 + PDF」
+                // 会悄悄忽略证件照设置，和预览/估算说的不是一回事。
+                let image: CGImage
+                if settings.idPhotoEnabled {
+                    image = try IDPhotoProcessor.makeIDPhoto(
+                        from: document.url,
+                        size: settings.idPhotoSize,
+                        background: settings.idPhotoBackground,
+                        dpi: settings.dpi,
+                        autoCrop: settings.idPhotoAutoCrop
+                    ).image
+                } else {
+                    // 按用户选的倍数缩放（默认 1× = 原始像素），与输出估算保持一致
+                    image = try ImageDecoder.decode(
+                        url: document.url,
+                        scale: settings.imageScale,
+                        maxPixels: settings.maxPixels
+                    )
+                }
                 pages.append(image)
                 observer.onProgress?(
                     ConversionProgress(

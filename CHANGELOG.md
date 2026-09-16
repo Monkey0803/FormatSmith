@@ -107,6 +107,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **"This resolution is over the safety limit" was reported for jobs that were nowhere near it.**
+  The estimate ignored ID photo mode: with 300 DPI it computed "input size × scale", so a 12 MP photo
+  became 212 MP on paper while the actual output was 295×413. Estimates are now computed per pipeline
+  (ID photo spec, photo sheet paper size, image pixels × scale, PDF points × DPI), and the message
+  names the real numbers.
+- **Images were silently enlarged by default.** For image input, DPI was used as a magnification
+  factor (200 DPI = 2.78×), so a 48 MP phone photo hit the pixel limit with the default settings.
+  Images now scale from their own pixels via the scale control (1× = original), DPI applies to PDFs,
+  and the CLI prints a note when `--dpi` is used on image-only input.
+
+### Changed
+
+- The default scale is 1× (original size) instead of 2×.
+
 - **Photo sheets printed one giant photo instead of a grid.** `PhotoSheetTiler.layout` returned
   pixel-based rects while `render` scaled the context to points, so every cell was drawn 4× too
   large. The layout now works in points throughout, and the tests sample every cell centre plus the
