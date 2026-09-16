@@ -113,6 +113,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Picking a preset left the previous one's settings in place.** Presets are now complete recipes:
+  applying one starts from defaults and keeps only your output preferences (folder, file name pattern,
+  subfolder, concurrency, pixel limit). Previously settings were patched in place, so a background
+  colour chosen earlier for ID photos stayed active — clicking *Print* and converting an image to PDF
+  produced a solid blue page. Any setting added later is now cleared by default too.
 - **Converting an image to PDF could come out as a solid blue page with the photo gone.** Vision's
   person segmentation returns a mask even when it finds nobody — an essentially black one (measured:
   0% foreground) — and the code only checked whether a mask *existed*, so it clipped everything away

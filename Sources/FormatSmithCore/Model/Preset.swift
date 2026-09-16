@@ -9,11 +9,39 @@ public struct Preset: Identifiable, Sendable {
     public let name: String
     public let detail: String
     public let systemImage: String
-    let apply: @Sendable (inout ConversionSettings) -> Void
+    /// 这个预设显式声明的改动。没声明的项由 `apply(to:)` 负责回到默认值。
+    let mutations: @Sendable (inout ConversionSettings) -> Void
 
+    /// 应用预设：以**默认设置**为底，只叠上预设自己声明的项。
+    ///
+    /// 这一点很要紧。以前是在当前设置上「打补丁」，预设没提到的项保持原样，
+    /// 于是上一次选的证件照（蓝底）会残留在下一次「打印」预设里 ——
+    /// 用户点的是「打印」，拿到的却是一块蓝色。
+    /// 预设是一份完整的配方，点下去就该得到确定的结果，
+    /// 而且这样以后新增设置项也不会漏掉清理。
+    ///
+    /// 只保留与「输出到哪、怎么写」有关的个人偏好：这些不属于任何预设。
     public func apply(to settings: inout ConversionSettings) {
-        apply(&settings)
-        settings.normalizeForFormat()
+        let current = settings
+        var fresh = ConversionSettings()
+        fresh.outputDirectoryPath = current.outputDirectoryPath
+        fresh.perFileSubfolder = current.perFileSubfolder
+        fresh.filenamePattern = current.filenamePattern
+        fresh.padsPageNumbers = current.padsPageNumbers
+        fresh.openFolderWhenFinished = current.openFolderWhenFinished
+        fresh.maxPixels = current.maxPixels
+        fresh.maxConcurrentFiles = current.maxConcurrentFiles
+
+        mutations(&fresh)
+        fresh.normalizeForFormat()
+        settings = fresh
+    }
+
+    /// 返回应用后的设置，不修改原值。
+    public func applied(to current: ConversionSettings) -> ConversionSettings {
+        var copy = current
+        apply(to: &copy)
+        return copy
     }
 }
 

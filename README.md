@@ -262,6 +262,18 @@ foreground) means the same as no mask. Treating it as a successful cut-out erase
 the page with the background colour. Coverage is checked instead, with anything below 0.5% treated as
 "no subject".
 
+## Presets are complete recipes
+
+Clicking a preset produces a known state: it starts from defaults and applies everything that preset
+declares. Any setting it does not mention goes back to its default, so nothing leaks from an earlier
+preset. Your output preferences — folder, file name pattern, subfolder, concurrency, pixel limit —
+are kept, because those belong to you rather than to a preset.
+
+This used to work differently, and the difference was visible: settings were patched in place, so an
+ID photo mode (blue background) chosen earlier stayed on when you clicked *Print*, and the next image
+you sent to PDF came out as a blue block. Every preset now also resets the ones it does not set, which
+means any setting added in the future is cleared by default too.
+
 ## Putting an ID card on one page
 
 Three ways, all producing the same A4 page with the front on top and the back below:

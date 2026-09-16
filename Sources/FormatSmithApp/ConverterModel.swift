@@ -379,18 +379,15 @@ final class ConverterModel: ObservableObject {
     // MARK: - 预设
 
     func apply(_ preset: Preset) {
-        var updated = settings
-        preset.apply(to: &updated)
-        settings = updated
+        // 预设是完整配方：没提到的项回到默认值，避免上一次的选择残留下来
+        settings = preset.applied(to: settings)
         status = StatusMessage("Applied preset: %@", preset.name)
         DebugLog.log("applied preset: \(preset.id)")
     }
 
     /// 当前设置是否正好等于某个预设。
     func matches(_ preset: Preset) -> Bool {
-        var candidate = settings
-        preset.apply(to: &candidate)
-        return candidate == settings
+        preset.applied(to: settings) == settings
     }
 
     // MARK: - 队列

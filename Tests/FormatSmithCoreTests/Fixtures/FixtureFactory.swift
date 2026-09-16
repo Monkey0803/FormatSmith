@@ -110,6 +110,23 @@ enum FixtureFactory {
         return url
     }
 
+    /// 生成一张纯色图（Vision 不会把它当人像），用于「底色有没有渗进来」这类断言。
+    static func makeSilhouette(
+        width: Int,
+        height: Int,
+        colour: (r: Double, g: Double, b: Double),
+        named name: String,
+        in directory: URL
+    ) throws -> URL {
+        let context = try BitmapContext.make(width: width, height: height, wantsAlpha: false)
+        context.setFillColor(color(colour))
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        guard let image = context.makeImage() else { throw FixtureError.cannotCreateContext }
+        let url = directory.appendingPathComponent("\(name).png")
+        try ImageEncoder.encode(image, format: .png, quality: 1.0).write(to: url)
+        return url
+    }
+
     /// 生成一张伪随机噪声图。
     ///
     /// 用于「压缩是否真的有用」这类测试：渐变图会被 Flate 压得比 JPEG 还小，
