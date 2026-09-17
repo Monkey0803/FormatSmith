@@ -11,6 +11,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Preview for every pipeline**, not just ID photos: composed PDF pages, page 1 of a PDF at the
+  chosen DPI, Office/HTML conversions, ID photos and photo sheets. Large outputs are drawn as
+  thumbnails while the caption keeps the real pixel or point size, and page/file counts are shown.
+  Preview and export share `PDFComposer.drawPage`, so the layout cannot drift.
+- **Batch summary with retry and drag-out**: after a run you see how many succeeded, which files
+  failed and why, with one-click retry that re-runs only the failed items, plus dragging a result
+  straight out to Finder or another app.
+- Two presets for the most common jobs: **Images to PDF** (one PDF, one page per image, original
+  size) and **PDF to images** (PNG per page at 150 DPI). Previously converting images to PDF meant
+  picking the Print preset — which produces TIFF — and then switching the output format by hand.
+- The pixel limit is adjustable in the Output card (120 MP to 1000 MP) instead of being a source-only
+  setting.
+
 - A live ID photo preview in the settings panel: it shows the real output (cut-out subject, background,
   framing, exact pixel size) before you export, and the photo sheet when tiling is on. Click to
   enlarge. `IDPhotoSession` caches decoding, face detection and segmentation per photo, so changing

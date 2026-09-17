@@ -34,6 +34,14 @@ in the app itself.
   with a page size that either matches the image or fits A4/Letter with a margin. Embed losslessly, or
   JPEG-compress the images to keep the file small.
 - **Images → images**: convert between formats and scale up or down (50%–400% or any custom factor).
+- **Live preview for every pipeline**: the settings panel shows the real result before you export —
+  the composed PDF page, page 1 of a PDF at the chosen DPI, an Office/HTML conversion, an ID photo, a
+  photo sheet. Large outputs are drawn as thumbnails, but the caption always states the real pixel or
+  point size, along with page and file counts. Preview and export share the same layout code
+  (`PDFComposer.drawPage`), so what you see cannot drift from what you get.
+- **Batch results you can act on**: when a run finishes you get a summary — how many succeeded, which
+  files failed and why — with one-click **Retry failed** that re-runs only the failed items, and a
+  drag-out from the row straight to Finder or another app.
 - **Live ID photo preview**: the settings panel shows the actual result — the cut-out subject, the
   new background, the exact framing and the real pixel size — before you export anything. Click it to
   enlarge. If tiling onto photo paper is on, you see the sheet too. Analysis is cached, so changing
@@ -288,6 +296,13 @@ Order comes from the queue: the first file goes on top. If you dragged them in t
 ↑ ↓ buttons on the row — dragging a file no longer gets re-sorted by name behind your back. Photos of
 different sizes are each fitted into their half, so a phone photo of the front and a flatbed scan of
 the back both come out readable.
+
+## Presets
+
+Ten presets cover the common jobs: Web (PNG at 2×), Email (JPEG), Print (lossless TIFF at 300 DPI),
+Archive (PNG at original size), **Images to PDF** (one PDF, one page per image), **PDF to images**
+(PNG per page at 150 DPI), ID photo, Photo sheet, ID scan (front and back on one A4 page) and Scanned
+PDF.
 
 ## Why there is a pixel limit
 
