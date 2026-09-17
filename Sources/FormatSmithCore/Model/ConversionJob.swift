@@ -34,6 +34,19 @@ public struct SourceDocument: Identifiable, Sendable, Equatable {
         self.displayName = displayName ?? url.deletingPathExtension().lastPathComponent
     }
 
+    /// 套用探测结果，保留原有 id（队列里已经用它标识这一项）。
+    public func with(info: DocumentInfo) -> SourceDocument {
+        SourceDocument(
+            id: id,
+            url: url,
+            kind: info.kind,
+            pageCount: info.pageCount,
+            size: info.displaySize,
+            byteSize: byteSize,
+            displayName: displayName
+        )
+    }
+
     /// 输入是从文件系统读来的，这里只取元信息，不做解码。
     public static func make(from url: URL) -> SourceDocument {
         let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)

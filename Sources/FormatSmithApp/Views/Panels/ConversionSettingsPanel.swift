@@ -315,14 +315,6 @@ struct ConversionSettingsPanel: View {
                     printSheetControls
                 }
 
-                Divider().padding(.vertical, 2)
-                if model.firstImageInput == nil {
-                    Text(Localized.text("Add a photo to see the preview."))
-                        .font(.system(size: 11))
-                        .foregroundStyle(.tertiary)
-                } else {
-                    IDPhotoPreviewView(preview: model.idPhotoPreview)
-                }
             }
         }
     }
@@ -945,6 +937,15 @@ struct ConversionSettingsPanel: View {
 
     private var previewSection: some View {
         SettingsCard(title: Localized.text("Preview"), systemImage: "eye") {
+            if model.convertibleItems.isEmpty {
+                Text(Localized.text("Add files to see the preview."))
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+            } else {
+                OutputPreviewView(preview: model.outputPreview)
+                Divider().padding(.vertical, 2)
+            }
+
             if let first = model.items.first(where: { $0.document.size.width > 0 }) {
                 VStack(alignment: .leading, spacing: 5) {
                     if model.target.isPDF, model.hasPDFInputs {

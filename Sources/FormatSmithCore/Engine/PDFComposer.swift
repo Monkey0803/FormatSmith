@@ -56,18 +56,56 @@ public enum PDFComposer {
             let boxData = NSData(bytes: &mutableBox, length: MemoryLayout<CGRect>.size)
             context.beginPDFPage([kCGPDFContextMediaBox as String: boxData] as CFDictionary)
 
-            context.interpolationQuality = .high
-            for (slot, image) in prepared.enumerated() {
-                let area = contentArea(forSlot: slot, of: prepared.count, in: box, settings: settings)
-                context.draw(image, in: placement(for: image, in: area))
-            }
-
+            drawPage(prepared, settings: settings, in: context, box: box)
             context.endPDFPage()
             onPageWritten?(index + 1, sheets.count)
         }
 
         context.closePDF()
         return target
+    }
+
+    /// 把一页的内容画进给定上下文。
+    ///
+    /// 预览与实际导出都走这里：这样「看到的版面」不可能和「导出的版面」不一致。
+    static func drawPage(_ images: [CGImage], settings: ConversionSettings, in context: CGContext, box: CGRect) {
+        context.interpolationQuality = .high
+        for (slot, image) in images.enumerated() {
+            let area = contentArea(forSlot: slot, of: images.count, in: box, settings: settings)
+            context.draw(image, in: placement(for: image, in: area))
+        }
+    }
+
+    /// 渲染第一页的预览图。
+    ///
+    /// 版面用的还是同一套计算，只是画到位图而不是 PDF 页上，
+    /// 并按上限缩小成缩略图 —— 尺寸会变，构图不会。
+    public static func previewPage(
+        images: [CGImage],
+        settings: ConversionSettings,
+        maxPixels: Int = 1_200_000
+    ) throws -> CGImage {
+        guard !images.isEmpty else {
+            throw ConversionError(Localized.text("There is nothing to convert."))
+        }
+
+        let box = pageBox(for: images, settings: settings)
+        let area = Double(box.width * box.height)
+        let shrink = area > Double(maxPixels) ? (Double(maxPixels) / area).squareRoot() : 1
+        let width = max(1, Int((box.width * shrink).rounded()))
+        let height = max(1, Int((box.height * shrink).rounded()))
+
+        let context = try BitmapContext.make(width: width, height: height, wantsAlpha: false)
+        context.fill(with: .white)
+        context.saveGState()
+        context.scaleBy(x: CGFloat(shrink), y: CGFloat(shrink))
+        drawPage(images, settings: settings, in: context, box: box)
+        context.restoreGState()
+
+        guard let image = context.makeImage() else {
+            throw ConversionError(Localized.text("Rendering failed."))
+        }
+        return image
     }
 
     // MARK: - 版面计算

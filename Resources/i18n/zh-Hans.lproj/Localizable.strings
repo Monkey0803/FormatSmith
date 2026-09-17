@@ -10,15 +10,15 @@
 "%@ was not found, so this format cannot be converted. %@" = "未找到 %@，无法转换该格式。%@";
 "%@ · %d × %d px" = "%@ · %d × %d 像素";
 "%@ · ready" = "%@ · 就绪";
+"%d file(s)" = "共 %d 个文件";
 "%d image(s) · %@" = "%d 张图片 · %@";
 "%d megapixels is over the %d megapixel safety limit — lower the DPI or scale." = "%d 百万像素，超过 %d 百万像素的安全上限，请降低 DPI 或倍数。";
 "%d of %d page(s)" = "共 %d 页中的 %d 页";
-"%d page(s)" = "%d 页";
+"%d page(s)" = "共 %d 页";
 "%d page(s) at %d DPI" = "%d 页 · %d DPI";
 "%d page(s) · ready" = "%d 页 · 就绪";
 "%d page(s) → %d file(s)" = "%d 页 → %d 个文件";
 "%d page(s) → 1 file" = "%d 页 → 1 个文件";
-"%d photos · %@" = "%d 张 · %@";
 "%d × %d mm paper · %d photos per sheet" = "%d × %d 毫米相纸 · 每张 %d 张照片";
 "1-inch" = "一寸";
 "1-inch photo, blue background, 300 DPI" = "一寸照、蓝底、300 DPI";
@@ -33,8 +33,8 @@
 "90° counter-clockwise" = "逆时针 90°";
 "Add" = "添加";
 "Add a file to see the estimated output." = "添加文件后显示输出预估。";
-"Add a photo to see the preview." = "添加一张照片即可看到预览。";
 "Add at least two PDFs to merge; with one file this just copies it." = "至少需要两个 PDF 才能合并；只有一个文件时等同于复制。";
+"Add files to see the preview." = "添加文件后即可看到预览。";
 "All images are merged into a single PDF." = "所有图片会合并成一个 PDF。";
 "All images into one compressed PDF" = "所有图片合并成一个压缩 PDF";
 "All pages" = "全部页面";
@@ -134,7 +134,9 @@
 "Not found" = "未找到";
 "One PDF per source file." = "每个源文件输出一个 PDF。";
 "One PDF, one page per image, at original size" = "合成一个 PDF，每张图片一页，保持原始尺寸";
+"One image" = "一张图片";
 "One image per page, numbered from 1." = "每页输出一张图片，页码从 1 开始。";
+"One page" = "一页";
 "One per page" = "每页一张";
 "Open" = "打开";
 "Open Output Folder" = "打开输出文件夹";
@@ -170,7 +172,6 @@
 "Rendering failed." = "渲染失败。";
 "Rendering preview…" = "正在生成预览…";
 "Resolution" = "输出分辨率";
-"Result" = "结果";
 "Rotate" = "旋转";
 "Scale" = "倍数";
 "Scanned PDF" = "扫描成 PDF";
@@ -193,8 +194,9 @@
 "The subject is cut out with on-device person segmentation." = "人像用系统本地的人像分割自动抠出，照片不会离开这台机器。";
 "There is nothing to convert." = "没有可转换的文件。";
 "This Mac cannot write %@ files." = "本机无法写出 %@ 文件。";
-"This PDF has no pages." = "该 PDF 没有页面。";
+"This PDF has no pages." = "这个 PDF 没有页面。";
 "This PDF is encrypted and needs a password." = "该 PDF 已加密，需要密码。";
+"This combination is not supported." = "这个组合不支持。";
 "This file type is not supported." = "不支持该文件类型。";
 "This image has no pixels to work with." = "这张图片没有可用的像素。";
 "This page has an invalid size." = "页面尺寸异常。";

@@ -20,17 +20,20 @@ enum ItemStatus: Equatable {
     }
 }
 
-/// 证件照预览：真正跑一遍处理管线得到的结果，所见即所得。
-struct IDPhotoPreview: Equatable {
-    var photo: NSImage?
-    var sheet: NSImage?
+/// 输出预览：真正跑一遍该走的管线得到的结果，所见即所得。
+struct OutputPreviewState: Equatable {
+    var image: NSImage?
+    var kind: OutputPreview.Kind = .image
     var caption: String = ""
     var notes: [String] = []
+    /// 会产出多少份文件 / 首份输出多少页。
+    var fileCount: Int = 1
+    var pageCount: Int = 1
     var isRendering = false
     var failure: String?
 
     var isEmpty: Bool {
-        photo == nil && sheet == nil && !isRendering && failure == nil
+        image == nil && !isRendering && failure == nil
     }
 }
 
@@ -56,7 +59,7 @@ final class ConverterModel: ObservableObject {
     @Published var settings: ConversionSettings {
         didSet {
             persistSettings()
-            scheduleIDPhotoPreview()
+            scheduleOutputPreview()
         }
     }
     @Published var isConverting = false
@@ -67,8 +70,8 @@ final class ConverterModel: ObservableObject {
         }
     }
     @Published var lastOutputFolder: URL?
-    /// 证件照预览。用户改一个参数就重算一次，但会防抖，并且复用同一个分析会话。
-    @Published var idPhotoPreview = IDPhotoPreview()
+    /// 输出预览。用户改一个参数就重算一次，但会防抖，并且复用同一个分析会话。
+    @Published var outputPreview = OutputPreviewState()
     /// 是否展开长尾格式。
     @Published var showsAllFormats = false
     /// 界面语言。改动会立刻生效（根视图用它的值做 id，从而重建整棵视图树）。
@@ -244,7 +247,8 @@ final class ConverterModel: ObservableObject {
     // MARK: - 证件照预览
 
     private var previewTask: Task<Void, Never>?
-    private var cachedSession: (path: String, session: IDPhotoSession)?
+    /// 预览复用同一个会话，证件照的人像分析只跑一次。
+    private let previewSession = OutputPreviewSession()
 
     /// 队列里第一张图片——证件照只处理图片输入。
     var firstImageInput: URL? {
@@ -252,128 +256,62 @@ final class ConverterModel: ObservableObject {
     }
 
     /// 安排一次预览。连续调参数时只在停下来之后算一次。
-    func scheduleIDPhotoPreview() {
+    func scheduleOutputPreview() {
         previewTask?.cancel()
 
-        if DebugLog.isEnabled {
-            DebugLog.log(
-                "preview scheduling: enabled=\(settings.idPhotoEnabled), "
-                    + "converting=\(isConverting), imageInput=\(firstImageInput?.lastPathComponent ?? "none")"
-            )
-        }
-        guard settings.idPhotoEnabled, !isConverting, let source = firstImageInput else {
-            if !idPhotoPreview.isEmpty { idPhotoPreview = IDPhotoPreview() }
+        guard !isConverting, !convertibleItems.isEmpty else {
+            if !outputPreview.isEmpty { outputPreview = OutputPreviewState() }
             return
         }
 
+        let documents = convertibleItems.map(\.document)
         let snapshot = settings
-        idPhotoPreview.isRendering = true
+        // 文档 → PDF 要真的跑一次转换（LibreOffice / WebKit），等用户停下来再触发
+        let expensive = OutputPreview.isExpensive(documents: documents, target: snapshot.target)
+        let delay: UInt64 = expensive ? 700_000_000 : 180_000_000
+
+        if DebugLog.isEnabled {
+            DebugLog.log(
+                "preview scheduling: files=\(documents.count), expensive=\(expensive), "
+                    + "target=\(snapshot.target.isPDF ? "pdf" : "image")"
+            )
+        }
+
+        outputPreview.isRendering = true
         previewTask = Task { @MainActor in
-            // 防抖：拖滑块时不要每一帧都去跑 Vision
-            try? await Task.sleep(nanoseconds: 180_000_000)
+            try? await Task.sleep(nanoseconds: delay)
             guard !Task.isCancelled else { return }
-            await self.renderIDPhotoPreview(source: source, settings: snapshot)
+            await self.renderOutputPreview(documents: documents, settings: snapshot)
         }
     }
 
-    private func renderIDPhotoPreview(source: URL, settings snapshot: ConversionSettings) async {
+    private func renderOutputPreview(documents: [SourceDocument], settings snapshot: ConversionSettings) async {
         do {
-            let session = try await analysisSession(for: source)
-            guard !Task.isCancelled else { return }
-
-            let rendered = try await Task.detached(priority: .userInitiated) { () -> PreviewRender in
-                let outcome = try session.render(
-                    size: snapshot.idPhotoSize,
-                    background: snapshot.idPhotoBackground,
-                    dpi: snapshot.dpi,
-                    autoCrop: snapshot.idPhotoAutoCrop
-                )
-                var sheet: CGImage?
-                var sheetCount = 0
-                if snapshot.printSheetEnabled {
-                    sheet = try PhotoSheetTiler.render(
-                        photo: outcome.image,
-                        photoSize: snapshot.idPhotoSize,
-                        sheet: snapshot.printSheet,
-                        dpi: snapshot.dpi,
-                        marginMM: snapshot.printSheetMarginMM,
-                        gapMM: snapshot.printSheetGapMM,
-                        cutGuides: snapshot.printSheetCutGuides
-                    )
-                    sheetCount =
-                        PhotoSheetTiler.layout(
-                            photo: snapshot.idPhotoSize,
-                            sheet: snapshot.printSheet,
-                            marginMM: snapshot.printSheetMarginMM,
-                            gapMM: snapshot.printSheetGapMM
-                        ).count
-                }
-                return PreviewRender(
-                    photo: outcome.image,
-                    sheet: sheet,
-                    sheetCount: sheetCount,
-                    notes: outcome.notes
-                )
+            let session = previewSession
+            let rendered = try await Task.detached(priority: .userInitiated) {
+                try session.render(documents: documents, target: snapshot.target, settings: snapshot)
             }.value
 
             guard !Task.isCancelled else { return }
-
-            let pixels = snapshot.idPhotoSize.pixelSize(dpi: snapshot.dpi)
             DebugLog.log(
-                "preview rendered: \(pixels.width)×\(pixels.height)px, "
-                    + "sheet=\(rendered.sheet != nil), notes=\(rendered.notes.count)"
+                "preview rendered: \(rendered.caption), files=\(rendered.fileCount), pages=\(rendered.pageCount)"
             )
-            idPhotoPreview = IDPhotoPreview(
-                photo: NSImage(cgImage: rendered.photo, size: .zero),
-                sheet: rendered.sheet.map { NSImage(cgImage: $0, size: .zero) },
-                caption: sheetCaption(
-                    count: rendered.sheetCount,
-                    pixels: pixels,
-                    settings: snapshot
-                ),
+            outputPreview = OutputPreviewState(
+                image: NSImage(cgImage: rendered.image, size: .zero),
+                kind: rendered.kind,
+                caption: rendered.caption,
                 notes: rendered.notes,
+                fileCount: rendered.fileCount,
+                pageCount: rendered.pageCount,
                 isRendering: false,
                 failure: nil
             )
         } catch {
             guard !Task.isCancelled else { return }
             let message = (error as? ConversionError)?.message ?? error.localizedDescription
-            idPhotoPreview = IDPhotoPreview(isRendering: false, failure: message)
+            DebugLog.log("preview failed: \(message)")
+            outputPreview = OutputPreviewState(isRendering: false, failure: message)
         }
-    }
-
-    private struct PreviewRender: Sendable {
-        let photo: CGImage
-        let sheet: CGImage?
-        let sheetCount: Int
-        let notes: [String]
-    }
-
-    /// 同一个文件的解码与分析结果复用，换参数时不用重跑 Vision。
-    private func analysisSession(for url: URL) async throws -> IDPhotoSession {
-        if let cached = cachedSession, cached.path == url.path {
-            return cached.session
-        }
-        let created = try await Task.detached(priority: .userInitiated) {
-            try IDPhotoSession(url: url)
-        }.value
-        cachedSession = (url.path, created)
-        return created
-    }
-
-    private func sheetCaption(
-        count: Int,
-        pixels: (width: Int, height: Int),
-        settings snapshot: ConversionSettings
-    ) -> String {
-        if snapshot.printSheetEnabled {
-            return Localized.text(
-                "%d photos · %@",
-                count,
-                snapshot.printSheet.displayName
-            )
-        }
-        return "\(pixels.width) × \(pixels.height) px" + " · " + snapshot.idPhotoSize.displayName
     }
 
     // MARK: - 预设
@@ -409,7 +347,7 @@ final class ConverterModel: ObservableObject {
         items.append(contentsOf: added)
         status = StatusMessage("Added %d file(s).", added.count)
         loadMetadata(for: added.map(\.id))
-        scheduleIDPhotoPreview()
+        scheduleOutputPreview()
     }
 
     /// 展开拖入的目录，收集支持的输入文件（含子目录）。
@@ -491,7 +429,7 @@ final class ConverterModel: ObservableObject {
                     loaded.0.pageCount > 0
                     ? .ready
                     : .failed(Localized.text("Could not read this file."))
-                self.scheduleIDPhotoPreview()
+                self.scheduleOutputPreview()
                 DebugLog.log(
                     "inspected \(url.lastPathComponent): \(loaded.0.kind.displayName), "
                         + "\(loaded.0.pageCount) page(s)/frame(s), "
@@ -507,7 +445,7 @@ final class ConverterModel: ObservableObject {
             let index = items.firstIndex(where: { $0.id == id }), index > 0
         else { return }
         items.swapAt(index, index - 1)
-        scheduleIDPhotoPreview()
+        scheduleOutputPreview()
     }
 
     /// 下移一项。
@@ -516,7 +454,7 @@ final class ConverterModel: ObservableObject {
             let index = items.firstIndex(where: { $0.id == id }), index < items.count - 1
         else { return }
         items.swapAt(index, index + 1)
-        scheduleIDPhotoPreview()
+        scheduleOutputPreview()
     }
 
     /// 该项能不能上移 / 下移，用于决定按钮是否可用。
@@ -532,7 +470,7 @@ final class ConverterModel: ObservableObject {
 
     func remove(id: UUID) {
         items.removeAll { $0.id == id }
-        scheduleIDPhotoPreview()
+        scheduleOutputPreview()
         if items.isEmpty {
             status = .idle
         }
@@ -541,7 +479,7 @@ final class ConverterModel: ObservableObject {
     func removeAll() {
         guard !isConverting else { return }
         items.removeAll()
-        scheduleIDPhotoPreview()
+        scheduleOutputPreview()
         overallProgress = 0
         status = .idle
     }

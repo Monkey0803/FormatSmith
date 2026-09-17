@@ -2,30 +2,23 @@ import AppKit
 import FormatSmithCore
 import SwiftUI
 
-/// 证件照预览：直接展示处理管线跑出来的结果。
+/// 输出预览：直接展示这条管线跑出来的结果。
 ///
-/// 换底色、按人脸构图这些效果没法用文字描述，只能看。
-/// 这里显示的就是导出时会得到的图，尺寸也和导出完全一致。
-struct IDPhotoPreviewView: View {
-    let preview: IDPhotoPreview
+/// 版面、底色、裁切这些效果没法用文字描述，只能看。这里显示的就是导出时会得到的图，
+/// 构图与导出完全一致，只是大图会缩成缩略图——真实尺寸写在说明文字里（不是缩略图的尺寸）。
+struct OutputPreviewView: View {
+    let preview: OutputPreviewState
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top, spacing: 10) {
-                if let photo = preview.photo {
-                    PreviewTile(
-                        image: photo,
-                        caption: Localized.text("Result"),
-                        height: 150
-                    )
-                }
-                if let sheet = preview.sheet {
-                    PreviewTile(
-                        image: sheet,
-                        caption: preview.caption,
-                        height: 150
-                    )
-                }
+            if let image = preview.image {
+                PreviewTile(
+                    image: image,
+                    caption: preview.caption,
+                    // PDF 页面铺白底，图片铺浅色底以便看出透明区域
+                    background: preview.kind == .pdfPage ? Color.white : Color(nsColor: .textBackgroundColor),
+                    height: 168
+                )
             }
 
             if preview.isRendering {
@@ -44,19 +37,33 @@ struct IDPhotoPreviewView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
+            if preview.image != nil {
+                Text(summary)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             ForEach(preview.notes, id: \.self) { note in
                 Label(note, systemImage: "info.circle")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-
-            if preview.photo != nil, preview.sheet == nil, !preview.caption.isEmpty {
-                Text(preview.caption)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.tertiary)
-            }
         }
+    }
+
+    /// 这次会产出多少、多少页——预览只画了第一份，剩下的靠这句话交代。
+    private var summary: String {
+        if preview.kind == .image {
+            return preview.fileCount > 1
+                ? Localized.text("%d file(s)", preview.fileCount)
+                : Localized.text("One image")
+        }
+        if preview.pageCount > 1 {
+            return Localized.text("%d page(s)", preview.pageCount)
+        }
+        return Localized.text("One page")
     }
 }
 
@@ -64,6 +71,7 @@ struct IDPhotoPreviewView: View {
 private struct PreviewTile: View {
     let image: NSImage
     let caption: String
+    let background: Color
     let height: CGFloat
 
     @State private var isEnlarged = false
@@ -75,7 +83,7 @@ private struct PreviewTile: View {
                 .aspectRatio(contentMode: .fit)
                 .frame(height: height)
                 .frame(maxWidth: .infinity)
-                .background(Color(nsColor: .textBackgroundColor))
+                .background(background)
                 .overlay(
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
                         .strokeBorder(Color.secondary.opacity(0.25), lineWidth: 1)
@@ -90,7 +98,7 @@ private struct PreviewTile: View {
                         Image(nsImage: image)
                             .resizable()
                             .aspectRatio(contentMode: .fit)
-                            .frame(maxWidth: 420, maxHeight: 520)
+                            .frame(maxWidth: 460, maxHeight: 560)
                         Text(caption)
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)

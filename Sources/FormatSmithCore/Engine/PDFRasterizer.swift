@@ -72,6 +72,16 @@ public enum PDFRasterizer {
 
     // MARK: - 渲染
 
+    /// 预览用的缩放系数：按上限缩小，但不放大。
+    ///
+    /// 真实输出可能是 600 DPI 的巨图，预览没必要照原样渲染一遍。
+    public static func previewScale(for page: CGPDFPage, desired: Double, maxPixels: Int) -> Double {
+        let box = page.getBoxRect(.mediaBox)
+        let area = abs(box.width * box.height) * desired * desired
+        guard area > Double(maxPixels), maxPixels > 0 else { return desired }
+        return desired * (Double(maxPixels) / area).squareRoot()
+    }
+
     public static func render(
         page: CGPDFPage,
         scale: Double,
