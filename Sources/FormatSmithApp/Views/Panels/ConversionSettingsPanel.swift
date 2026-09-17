@@ -783,6 +783,14 @@ struct ConversionSettingsPanel: View {
 
     // MARK: 输出
 
+    /// 可选的输出像素上限档位；当前值不在档位里时也要能显示出来。
+    private var pixelLimitChoices: [Int] {
+        let standard = [120, 250, 500, 1000].map { $0 * 1_000_000 }
+        return standard.contains(model.settings.maxPixels)
+            ? standard
+            : ([model.settings.maxPixels] + standard).sorted()
+    }
+
     private var outputSection: some View {
         SettingsCard(title: Localized.text("Output"), systemImage: "folder") {
             HStack(spacing: 6) {
@@ -855,6 +863,34 @@ struct ConversionSettingsPanel: View {
                 )
             )
             .font(.system(size: 12))
+
+            Divider().padding(.vertical, 2)
+
+            HStack(spacing: 8) {
+                Text(Localized.text("Pixel limit"))
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                Picker(
+                    "",
+                    selection: Binding(
+                        get: { model.settings.maxPixels },
+                        set: { model.settings.maxPixels = $0 }
+                    )
+                ) {
+                    ForEach(pixelLimitChoices, id: \.self) { value in
+                        Text(verbatim: "\(value / 1_000_000) MP").tag(value)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .frame(width: 96)
+                Spacer(minLength: 4)
+            }
+
+            Text(Localized.text("Larger outputs than this are refused before any work starts."))
+                .font(.system(size: 10))
+                .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
 
             if model.convertibleItems.count > 1 {
                 HStack(spacing: 8) {

@@ -104,6 +104,7 @@
 "Images are embedded losslessly, so the PDF can be large." = "图片以无损方式嵌入，PDF 可能较大。";
 "Images are scaled from their own pixels: 1× keeps the original size." = "图片按自身像素缩放，1× 即原始尺寸。";
 "Images are scaled to fit and centered on the page." = "图片等比缩放后居中放置。";
+"Images to PDF" = "图片合成 PDF";
 "Install it with Homebrew, or download it from libreoffice.org." = "可以用 Homebrew 安装，也可以从 libreoffice.org 下载。";
 "Install it with Homebrew. Markdown still converts without it, using the built-in renderer." = "可以用 Homebrew 安装；没装时 Markdown 仍会用内置渲染器转换。";
 "JPEG, small enough to attach" = "JPEG，体积适合邮件附件";
@@ -113,6 +114,7 @@
 "Language" = "语言";
 "Large 1-inch / passport" = "大一寸 / 小二寸 / 护照";
 "Large 2-inch" = "大二寸";
+"Larger outputs than this are refused before any work starts." = "超过这个像素数的输出会在开始前被拒绝。";
 "Lossless" = "无损";
 "Lossy" = "有损";
 "Make an ID photo" = "按证件照处理";
@@ -131,6 +133,7 @@
 "Not available in this build yet." = "当前版本尚未提供该功能。";
 "Not found" = "未找到";
 "One PDF per source file." = "每个源文件输出一个 PDF。";
+"One PDF, one page per image, at original size" = "合成一个 PDF，每张图片一页，保持原始尺寸";
 "One image per page, numbered from 1." = "每页输出一张图片，页码从 1 开始。";
 "One per page" = "每页一张";
 "Open" = "打开";
@@ -140,16 +143,19 @@
 "Output format" = "输出格式";
 "PDF page" = "PDF 页面";
 "PDF size" = "PDF 体积";
+"PDF to images" = "PDF 转图片";
 "PDF tool" = "PDF 工具";
 "PDFs and images. Multiple files are fine, and folders work too." = "支持 PDF 与图片，可多选，也支持整个文件夹。";
 "PNG at 2× — crisp on Retina screens" = "2 倍 PNG，在高分屏上更清晰";
 "PNG at original size, nothing thrown away" = "原始尺寸 PNG，不做任何有损处理";
+"PNG per page at 150 DPI" = "每页一张 PNG，150 DPI";
 "Page ranges apply to PDF input only; images are always exported whole." = "页码范围仅对 PDF 生效，图片始终整张导出。";
 "Pages" = "页面范围";
 "Pages per file" = "每个文件的页数";
 "Parallel files" = "并行文件数";
 "Photo sheet" = "相纸排版";
 "Photographs shrink a lot; images with transparency are kept lossless." = "照片类图片体积可大幅下降；带透明通道的图片保持无损。";
+"Pixel limit" = "像素上限";
 "Placeholders: {name} {page} {total} {date} {time}" = "可用占位符：{name} {page} {total} {date} {time}";
 "Presets" = "预设";
 "Preview" = "输出预估";

@@ -156,6 +156,33 @@ public enum PresetLibrary {
         },
 
         Preset(
+            id: "imagesToPDF",
+            name: Localized.text("Images to PDF"),
+            detail: Localized.text("One PDF, one page per image, at original size"),
+            systemImage: "doc.richtext"
+        ) { settings in
+            settings.target = .pdf
+            settings.pdfLayout = .onePerPage
+            settings.pdfPageSize = .fitImage
+            settings.mergeImagesIntoOnePDF = true
+            settings.pdfCompressesImages = true
+            settings.pdfImageQuality = 0.85
+        },
+
+        Preset(
+            id: "pdfToImages",
+            name: Localized.text("PDF to images"),
+            detail: Localized.text("PNG per page at 150 DPI"),
+            systemImage: "photo.on.rectangle.angled"
+        ) { settings in
+            settings.target = .image(.png)
+            settings.resolutionMode = .dpi
+            settings.dpi = 150
+            settings.scale = 1
+            settings.background = .white
+        },
+
+        Preset(
             id: "scan",
             name: Localized.text("Scanned PDF"),
             detail: Localized.text("All images into one compressed PDF"),

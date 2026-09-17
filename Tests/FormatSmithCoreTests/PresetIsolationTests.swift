@@ -143,3 +143,103 @@ final class PresetIsolationTests: XCTestCase {
         XCTAssertEqual(blueSamples, 0, "页面上不该出现证件照蓝底")
     }
 }
+
+/// 新补的预设确实产出它声称的东西。
+final class NewPresetBehaviourTests: XCTestCase {
+
+    private var directory: URL!
+    private var output: URL!
+
+    override func setUpWithError() throws {
+        directory = try FixtureFactory.makeTemporaryDirectory()
+        output = directory.appendingPathComponent("out", isDirectory: true)
+        try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+    }
+
+    override func tearDownWithError() throws {
+        try? FileManager.default.removeItem(at: directory)
+    }
+
+    private func preset(_ id: String) throws -> Preset {
+        try XCTUnwrap(PresetLibrary.all.first { $0.id == id }, "找不到预设 \(id)")
+    }
+
+    func testImagesToPDFAsksTheRouterToMerge() throws {
+        // 合并与否由 ConversionRouter 决定，界面和命令行都照它执行。
+        // 所以断言「这个预设会不会触发合并」，就是断言它的实际行为。
+        let settings = try preset("imagesToPDF").applied(to: ConversionSettings())
+
+        let twoImages = ConversionRouter.strategy(
+            inputs: [.image(identifier: "public.png"), .image(identifier: "public.png")],
+            target: settings.target,
+            mergesImages: settings.mergeImagesIntoOnePDF
+        )
+        XCTAssertEqual(twoImages, .imagesToOnePDF, "两张图应当合并成一个 PDF")
+
+        let oneImage = ConversionRouter.strategy(
+            inputs: [.image(identifier: "public.png")],
+            target: settings.target,
+            mergesImages: settings.mergeImagesIntoOnePDF
+        )
+        XCTAssertEqual(oneImage, .imageToPDF, "单张图就是一页 PDF")
+    }
+
+    func testImagesToPDFProducesOnePDFWithOnePagePerImage() throws {
+        let first = try FixtureFactory.makeImage(width: 400, height: 300, named: "a", in: directory)
+        let second = try FixtureFactory.makeImage(width: 300, height: 400, named: "b", in: directory)
+
+        var settings = try preset("imagesToPDF").applied(to: ConversionSettings())
+        settings.outputDirectoryPath = output.path
+        settings.perFileSubfolder = false
+        settings.filenamePattern = "bundle"
+
+        let result = ConversionEngine.composePDF(
+            documents: [SourceDocument.make(from: first), SourceDocument.make(from: second)],
+            settings: settings,
+            cancellation: CancellationFlag()
+        )
+
+        XCTAssertNil(result.error)
+        XCTAssertEqual(result.outputFiles.count, 1, "应当只有一个 PDF 文件")
+        let pdf = try XCTUnwrap(result.outputFiles.first)
+        XCTAssertEqual(pdf.pathExtension, "pdf")
+
+        let document = try XCTUnwrap(PDFRasterizer.open(pdf))
+        XCTAssertEqual(document.numberOfPages, 2, "两张图应该是两页")
+        // 「跟随图片」时每页就是各自的像素尺寸
+        let page = try XCTUnwrap(document.page(at: 1))
+        let box = page.getBoxRect(.mediaBox)
+        XCTAssertEqual(Int(box.width), 400)
+        XCTAssertEqual(Int(box.height), 300)
+    }
+
+    func testPDFToImagesWritesOneFilePerPage() throws {
+        let pdf = try FixtureFactory.makePDF(pages: 3, named: "doc", in: directory)
+
+        var settings = try preset("pdfToImages").applied(to: ConversionSettings())
+        settings.outputDirectoryPath = output.path
+        settings.perFileSubfolder = false
+        settings.filenamePattern = "page"
+
+        let result = ConversionEngine.convert(
+            document: SourceDocument.make(from: pdf),
+            target: .image(.png),
+            settings: settings,
+            cancellation: CancellationFlag()
+        )
+
+        XCTAssertNil(result.error)
+        XCTAssertEqual(result.outputFiles.count, 3, "三页应当产出三个文件")
+        for url in result.outputFiles {
+            XCTAssertEqual(url.pathExtension, "png")
+        }
+    }
+
+    func testPrintPresetStaysLosslessImage() throws {
+        // 「打印」产出的是 TIFF 母版，不是 PDF：说明文案里写清楚了，
+        // 而「图片合成 PDF」是另一个独立预设
+        let settings = try preset("print").applied(to: ConversionSettings())
+        XCTAssertEqual(settings.target, .image(.tiff))
+        XCTAssertFalse(settings.target.isPDF)
+    }
+}
