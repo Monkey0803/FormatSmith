@@ -37,6 +37,9 @@ struct ConversionSettingsPanel: View {
                     pageRangeSection
                 }
                 outputSection
+                if let summary = model.batchSummary, !summary.isEmpty {
+                    BatchSummaryCard(model: model)
+                }
                 previewSection
                 languageSection
             }

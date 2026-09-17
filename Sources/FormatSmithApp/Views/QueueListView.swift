@@ -222,6 +222,29 @@ struct QueueRowView: View {
         }
     }
 
+    /// 拖拽内容：一份文件就拖文件本身，多份就拖所在文件夹。
+    private var dragProvider: NSItemProvider {
+        guard case let .finished(_, folder, outputs) = item.status else {
+            return NSItemProvider()
+        }
+        if outputs.count == 1, let only = outputs.first {
+            return NSItemProvider(contentsOf: only) ?? NSItemProvider()
+        }
+        if let folder {
+            return NSItemProvider(contentsOf: folder) ?? NSItemProvider()
+        }
+        return NSItemProvider()
+    }
+
+    private var dragHelp: String {
+        guard case let .finished(_, _, outputs) = item.status else {
+            return Localized.text("Show in Finder")
+        }
+        return outputs.count == 1
+            ? Localized.text("Drag the result out, or click to show it in Finder")
+            : Localized.text("Drag the output folder out, or click to show it in Finder")
+    }
+
     private var thumbnail: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 6, style: .continuous)
@@ -269,7 +292,7 @@ struct QueueRowView: View {
             return Localized.text("%d page(s) · ready", item.document.pageCount)
         case let .converting(done, total):
             return Localized.text("Converting %d of %d", done, total)
-        case let .finished(files, _):
+        case let .finished(files, _, _):
             return Localized.text("Done · %d image(s) written", files)
         case let .failed(message):
             return Localized.text("Failed: %@", message)
@@ -301,7 +324,7 @@ struct QueueRowView: View {
             .foregroundStyle(Color.accentColor)
         case .finished:
             Button {
-                if case let .finished(_, folder) = item.status, let folder {
+                if case let .finished(_, folder, _) = item.status, let folder {
                     model.reveal(folder)
                 }
             } label: {
@@ -317,6 +340,9 @@ struct QueueRowView: View {
                 .foregroundStyle(Color.green)
             }
             .buttonStyle(.plain)
+            // 结果可以直接拖出去：单个文件拖文件，多个文件拖整个输出文件夹
+            .onDrag { dragProvider }
+            .help(dragHelp)
         case .failed:
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(.orange)

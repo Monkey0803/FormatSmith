@@ -10,7 +10,9 @@
 "%@ was not found, so this format cannot be converted. %@" = "未找到 %@，无法转换该格式。%@";
 "%@ · %d × %d px" = "%@ · %d × %d 像素";
 "%@ · ready" = "%@ · 就绪";
+"%d failed" = "失败 %d 个";
 "%d file(s)" = "共 %d 个文件";
+"%d file(s) written" = "共写出 %d 个文件";
 "%d image(s) · %@" = "%d 张图片 · %@";
 "%d megapixels is over the %d megapixel safety limit — lower the DPI or scale." = "%d 百万像素，超过 %d 百万像素的安全上限，请降低 DPI 或倍数。";
 "%d of %d page(s)" = "共 %d 页中的 %d 页";
@@ -19,6 +21,7 @@
 "%d page(s) · ready" = "%d 页 · 就绪";
 "%d page(s) → %d file(s)" = "%d 页 → %d 个文件";
 "%d page(s) → 1 file" = "%d 页 → 1 个文件";
+"%d succeeded" = "成功 %d 个";
 "%d × %d mm paper · %d photos per sheet" = "%d × %d 毫米相纸 · 每张 %d 张照片";
 "1-inch" = "一寸";
 "1-inch photo, blue background, 300 DPI" = "一寸照、蓝底、300 DPI";
@@ -44,6 +47,7 @@
 "Black" = "黑色";
 "Blue" = "蓝底";
 "Cancel" = "取消";
+"Cancelled" = "已取消";
 "Cancelled." = "已取消。";
 "Cannot read %@ files." = "无法读取 %@ 文件。";
 "Cannot read this PDF (the file may be damaged or password protected)." = "无法解析该 PDF（文件可能已损坏或受密码保护）。";
@@ -77,8 +81,11 @@
 "Create PDF" = "生成 PDF";
 "Custom" = "自定义";
 "Cut guides" = "裁切辅助线";
+"Dismiss" = "关闭";
 "Documents" = "文档";
 "Done · %d image(s) written" = "完成 · 已输出 %d 张图片";
+"Drag the output folder out, or click to show it in Finder" = "可拖出输出文件夹，点击则在访达中显示";
+"Drag the result out, or click to show it in Finder" = "可直接拖出结果，点击则在访达中显示";
 "Drop files here" = "把文件拖到这里";
 "Each image" = "单张尺寸";
 "Each image gets its own page." = "每张图片单独占一页。";
@@ -140,6 +147,7 @@
 "One per page" = "每页一张";
 "Open" = "打开";
 "Open Output Folder" = "打开输出文件夹";
+"Open output folder" = "打开输出目录";
 "Open output folder when finished" = "完成后打开输出文件夹";
 "Output" = "输出";
 "Output format" = "输出格式";
@@ -172,10 +180,14 @@
 "Rendering failed." = "渲染失败。";
 "Rendering preview…" = "正在生成预览…";
 "Resolution" = "输出分辨率";
+"Result" = "结果";
+"Retry failed" = "重试失败的";
 "Rotate" = "旋转";
 "Scale" = "倍数";
 "Scanned PDF" = "扫描成 PDF";
+"Show all %d" = "展开全部 %d 条";
 "Show all formats" = "显示全部格式";
+"Show fewer" = "收起";
 "Show in Finder" = "在访达中显示";
 "Small 1-inch" = "小一寸";
 "Split" = "拆分";

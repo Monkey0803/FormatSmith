@@ -9,7 +9,7 @@ enum ItemStatus: Equatable {
     case loading
     case ready
     case converting(done: Int, total: Int)
-    case finished(files: Int, folder: URL?)
+    case finished(files: Int, folder: URL?, outputs: [URL] = [])
     case failed(String)
 
     var isTerminal: Bool {
@@ -18,6 +18,27 @@ enum ItemStatus: Equatable {
         default: return false
         }
     }
+}
+
+/// 一轮转换的结果汇总。
+///
+/// 批量转换里最要紧的是「哪几个没成功、为什么」——只给一句「完成 3/5」，
+/// 用户还得自己一个个点开看。
+struct BatchSummary: Equatable {
+    struct Failure: Equatable, Identifiable {
+        let id: UUID
+        let name: String
+        let message: String
+    }
+
+    var succeeded: Int = 0
+    var failures: [Failure] = []
+    var outputCount: Int = 0
+    var outputFolder: URL?
+    var cancelled = false
+
+    var isEmpty: Bool { succeeded == 0 && failures.isEmpty }
+    var hasFailures: Bool { !failures.isEmpty }
 }
 
 /// 输出预览：真正跑一遍该走的管线得到的结果，所见即所得。
@@ -72,6 +93,8 @@ final class ConverterModel: ObservableObject {
     @Published var lastOutputFolder: URL?
     /// 输出预览。用户改一个参数就重算一次，但会防抖，并且复用同一个分析会话。
     @Published var outputPreview = OutputPreviewState()
+    /// 上一轮转换的结果汇总；开跑新一轮时清空。
+    @Published var batchSummary: BatchSummary?
     /// 是否展开长尾格式。
     @Published var showsAllFormats = false
     /// 界面语言。改动会立刻生效（根视图用它的值做 id，从而重建整棵视图树）。
@@ -535,10 +558,10 @@ final class ConverterModel: ObservableObject {
 
     // MARK: - 转换
 
-    func startConversion() {
+    func startConversion(only limitedTo: Set<UUID>? = nil) {
         guard !isConverting else { return }
 
-        let queue = convertibleItems
+        let queue = limitedTo.map { ids in convertibleItems.filter { ids.contains($0.id) } } ?? convertibleItems
         guard !queue.isEmpty else {
             status = StatusMessage("There is nothing to convert.")
             return
@@ -562,6 +585,7 @@ final class ConverterModel: ObservableObject {
         isConverting = true
         overallProgress = 0
         lastOutputFolder = nil
+        batchSummary = nil
         for item in queue {
             if let index = items.firstIndex(where: { $0.id == item.id }) {
                 items[index].status = .ready
@@ -787,7 +811,11 @@ final class ConverterModel: ObservableObject {
         if let error = result.error {
             items[idx].status = .failed(error.message)
         } else {
-            items[idx].status = .finished(files: result.producedCount, folder: result.outputFolder)
+            items[idx].status = .finished(
+                files: result.producedCount,
+                folder: result.outputFolder,
+                outputs: result.outputFiles
+            )
         }
     }
 
@@ -804,6 +832,7 @@ final class ConverterModel: ObservableObject {
         isConverting = false
         overallProgress = cancelled ? 0 : 1
         lastOutputFolder = lastFolder
+        batchSummary = Self.summarise(items: items, folder: lastFolder, cancelled: cancelled)
 
         if cancelled {
             status = StatusMessage("Cancelled.")
@@ -819,6 +848,45 @@ final class ConverterModel: ObservableObject {
             status = StatusMessage("Finished: %d file(s) → %@", finished, root.path)
             if snapshot.openFolderWhenFinished { openOutputFolder() }
         }
+    }
+
+    /// 从当前队列状态生成汇总。
+    ///
+    /// 统计的是「队列现在的状态」，而不是「这一轮跑了什么」：
+    /// 重试成功后卡片会显示全部成功，重试按钮随之消失，符合直觉。
+    private static func summarise(items: [QueueItem], folder: URL, cancelled: Bool) -> BatchSummary {
+        var summary = BatchSummary(outputFolder: folder, cancelled: cancelled)
+        for item in items {
+            switch item.status {
+            case .finished(let files, _, _):
+                summary.succeeded += 1
+                summary.outputCount += files
+            case .failed(let message):
+                summary.failures.append(
+                    BatchSummary.Failure(id: item.id, name: item.name, message: message)
+                )
+            default:
+                break
+            }
+        }
+        return summary
+    }
+
+    /// 只重跑上一轮失败的项。
+    func retryFailedItems() {
+        guard !isConverting, let summary = batchSummary, summary.hasFailures else { return }
+        let failed = Set(summary.failures.map(\.id))
+
+        for index in items.indices where failed.contains(items[index].id) {
+            items[index].status = .ready
+        }
+        DebugLog.log("retrying \(failed.count) failed item(s)")
+        startConversion(only: failed)
+    }
+
+    /// 清掉汇总卡片。
+    func dismissBatchSummary() {
+        batchSummary = nil
     }
 
     func cancelConversion() {
