@@ -35,6 +35,8 @@ public struct SettingsScope: Equatable, Sendable {
         case pdfLayout
         /// PDF 内嵌图片压缩
         case pdfCompression
+        /// 输出文件保留哪些元数据
+        case metadata
     }
 
     public enum State: Equatable, Sendable {
@@ -126,6 +128,10 @@ public struct SettingsScope: Equatable, Sendable {
 
         case .pdfCompression:
             return targetIsPDF ? .active : .inactive
+
+        case .metadata:
+            // 元数据是写在图片文件里的；PDF 输出走另一套（图片被嵌进页面）
+            return hasImages && !targetIsPDF ? .active : .inactive
         }
     }
 

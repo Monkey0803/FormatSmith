@@ -522,6 +522,18 @@ public enum ConversionEngine {
             )
 
             var notes: [String] = []
+
+            // 动图：只有「目标也是动图格式 + 没有改尺寸」时才可能原样保留，
+            // 否则只能取第一帧 —— 那就必须说清楚，不能悄悄丢帧。
+            let frameCount = ImageDecoder.frameCount(of: document.url)
+            let keepsAnimation =
+                frameCount > 1
+                && settings.format == .gif
+                && !settings.idPhotoEnabled
+                && !settings.printSheetEnabled
+                && settings.imageScale(for: document.info) == 1
+                && settings.maxLongEdge == 0
+
             var prepared: CGImage
 
             if settings.idPhotoEnabled {
@@ -568,10 +580,48 @@ public enum ConversionEngine {
 
             let fileName = OutputNaming.fileName(
                 for: document.displayName, page: nil, pageCount: nil, settings: settings)
+
+            if keepsAnimation {
+                let animated = try ImageEncoder.writeAnimated(
+                    from: document.url,
+                    format: settings.format,
+                    metadata: ImageEncoder.metadata(from: document.url, policy: settings.metadataPolicy),
+                    to: target.appendingPathComponent(fileName)
+                )
+                written.append(animated)
+                observer.onProgress?(
+                    ConversionProgress(
+                        completedUnits: 1,
+                        totalUnits: 1,
+                        fileIndex: fileIndex,
+                        fileCount: fileCount,
+                        documentID: document.id
+                    )
+                )
+                return ConversionResult(
+                    documentID: document.id,
+                    outputFiles: written,
+                    outputFolder: folder,
+                    producedCount: written.count,
+                    duration: Date().timeIntervalSince(started),
+                    notes: notes
+                )
+            }
+
+            if frameCount > 1 {
+                notes.append(
+                    Localized.text(
+                        "Animated image: only the first frame was converted. Pick GIF to keep it."
+                    )
+                )
+            }
+
             let url = try ImageEncoder.write(
                 prepared,
                 format: settings.format,
                 quality: settings.quality,
+                // 拍摄信息从源文件带过来；证件照这类重新构图的输出同样保留它
+                metadata: ImageEncoder.metadata(from: document.url, policy: settings.metadataPolicy),
                 to: target.appendingPathComponent(fileName)
             )
             written.append(url)

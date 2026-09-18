@@ -87,6 +87,12 @@ public struct ConversionSettings: Codable, Equatable, Sendable {
     public var producesPDF: Bool = false
     /// 有损格式的压缩质量，0.05–1.0。
     public var quality: Double = 0.9
+    /// 转换后怎么处理原始元数据（EXIF / GPS / 相机信息）。
+    ///
+    /// 默认保留。以前是**静默全部丢弃**——相机型号、拍摄时间、地点全没了，
+    /// 而这类信息有时是用户特意想留的，有时又是不想带出去的；
+    /// 哪一种都不该由工具悄悄替用户决定。
+    public var metadataPolicy: MetadataPolicy = .keep
 
     // 分辨率
     public var resolutionMode: ResolutionMode = .dpi

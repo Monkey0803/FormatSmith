@@ -71,6 +71,13 @@ enum CommandLineTool {
                     }
                 }
 
+            case "--metadata":
+                let names = MetadataPolicy.allCases.map(\.rawValue).joined(separator: ", ")
+                guard let value = nextValue(argument), let policy = MetadataPolicy(rawValue: value) else {
+                    fail("Use --metadata \(names).")
+                }
+                settings.metadataPolicy = policy
+
             case "--max-edge":
                 if let value = nextValue(argument), let number = Int(value) {
                     settings.maxLongEdge = max(0, number)
@@ -459,7 +466,10 @@ enum CommandLineTool {
               --pages <range>       Page range used by --pdf-tool extract
 
             Images to PDF:
-              ID photo:
+              Metadata:
+              --metadata <policy>   keep | stripLocation | stripAll  (default: keep)
+
+            ID photo:
               --id-photo <size>     \(IDPhotoSize.allCases.map(\.cliName).joined(separator: " | "))
               --id-bg <colour>      white | blue | red | keep   (default: white)
               --no-face-crop        Centre the photo instead of composing around the face

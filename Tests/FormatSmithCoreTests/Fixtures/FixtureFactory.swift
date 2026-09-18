@@ -127,6 +127,89 @@ enum FixtureFactory {
         return url
     }
 
+    /// 生成一张真正的多帧 GIF。
+    ///
+    /// 手写 GIF 字节很容易造出「看着有 3 个帧块、ImageIO 只认 1 帧」的假货，
+    /// 所以这里用 ImageIO 自己写，保证是真动图。
+    @discardableResult
+    static func makeAnimatedGIF(
+        frames: Int = 3,
+        width: Int = 60,
+        height: Int = 40,
+        delay: Double = 0.2,
+        named name: String,
+        in directory: URL
+    ) throws -> URL {
+        let url = directory.appendingPathComponent("\(name).gif")
+        guard
+            let destination = CGImageDestinationCreateWithURL(
+                url as CFURL, "com.compuserve.gif" as CFString, frames, nil
+            )
+        else { throw FixtureError.cannotCreateContext }
+
+        for index in 0..<frames {
+            let context = try BitmapContext.make(width: width, height: height, wantsAlpha: false)
+            let level = Double(index) / Double(max(frames - 1, 1))
+            context.setFillColor(color((r: 0.2 + level * 0.7, g: 0.3, b: 0.6)))
+            context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+            guard let frame = context.makeImage() else { throw FixtureError.cannotCreateContext }
+
+            var gif: [CFString: Any] = [kCGImagePropertyGIFDelayTime: delay]
+            if index == 0 { gif[kCGImagePropertyGIFLoopCount] = 0 }
+            CGImageDestinationAddImage(
+                destination,
+                frame,
+                [kCGImagePropertyGIFDictionary: gif] as CFDictionary
+            )
+        }
+
+        guard CGImageDestinationFinalize(destination) else { throw FixtureError.cannotCreateContext }
+        return url
+    }
+
+    /// 生成一张带 EXIF / GPS 的图，用来验证元数据是否被保留。
+    @discardableResult
+    static func makeTaggedImage(
+        width: Int = 800,
+        height: Int = 600,
+        orientation: Int = 1,
+        named name: String,
+        in directory: URL
+    ) throws -> URL {
+        let context = try BitmapContext.make(width: width, height: height, wantsAlpha: false)
+        context.setFillColor(color(Palette.red))
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        guard let image = context.makeImage() else { throw FixtureError.cannotCreateContext }
+
+        let url = directory.appendingPathComponent("\(name).jpg")
+        guard
+            let destination = CGImageDestinationCreateWithURL(
+                url as CFURL, "public.jpeg" as CFString, 1, nil
+            )
+        else { throw FixtureError.cannotCreateContext }
+
+        let properties: [String: Any] = [
+            kCGImagePropertyOrientation as String: orientation,
+            kCGImagePropertyExifDictionary as String: [
+                kCGImagePropertyExifDateTimeOriginal as String: "2024:03:15 10:30:00",
+                kCGImagePropertyExifFNumber as String: 2.8,
+            ],
+            kCGImagePropertyTIFFDictionary as String: [
+                kCGImagePropertyTIFFMake as String: "Apple",
+                kCGImagePropertyTIFFModel as String: "iPhone 15 Pro",
+            ],
+            kCGImagePropertyGPSDictionary as String: [
+                kCGImagePropertyGPSLatitude as String: 31.2304,
+                kCGImagePropertyGPSLatitudeRef as String: "N",
+                kCGImagePropertyGPSLongitude as String: 121.4737,
+                kCGImagePropertyGPSLongitudeRef as String: "E",
+            ],
+        ]
+        CGImageDestinationAddImage(destination, image, properties as CFDictionary)
+        guard CGImageDestinationFinalize(destination) else { throw FixtureError.cannotCreateContext }
+        return url
+    }
+
     /// 生成一张伪随机噪声图。
     ///
     /// 用于「压缩是否真的有用」这类测试：渐变图会被 Flate 压得比 JPEG 还小，

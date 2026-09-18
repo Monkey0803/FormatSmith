@@ -41,11 +41,13 @@
 "All images are merged into a single PDF." = "所有图片会合并成一个 PDF。";
 "All images into one compressed PDF" = "所有图片合并成一个压缩 PDF";
 "All pages" = "全部页面";
+"Animated image: only the first frame was converted. Pick GIF to keep it." = "这是一张动图，只转换了第一帧。选择 GIF 格式可以保留动画。";
 "Archive" = "归档";
 "Auto" = "自动";
 "Background" = "背景";
 "Black" = "黑色";
 "Blue" = "蓝底";
+"Camera, capture time and location are carried over." = "相机、拍摄时间与地点都会带到输出文件。";
 "Cancel" = "取消";
 "Cancelled" = "已取消";
 "Cancelled." = "已取消。";
@@ -116,8 +118,10 @@
 "Install it with Homebrew. Markdown still converts without it, using the built-in renderer." = "可以用 Homebrew 安装；没装时 Markdown 仍会用内置渲染器转换。";
 "JPEG, small enough to attach" = "JPEG，体积适合邮件附件";
 "Join several PDFs into one document." = "把多个 PDF 首尾相接合成一个文档。";
+"Keep everything" = "全部保留";
 "Keep only the pages you list." = "只保留你列出的页面。";
 "Keep original" = "保留原背景";
+"Keeps camera and time, drops GPS coordinates." = "保留相机与时间，去掉 GPS 坐标。";
 "Language" = "语言";
 "Large 1-inch / passport" = "大一寸 / 小二寸 / 护照";
 "Large 2-inch" = "大二寸";
@@ -178,7 +182,9 @@
 "Ready" = "就绪";
 "Red" = "红底";
 "Release to add" = "松开以添加";
+"Remove all metadata" = "去掉全部元数据";
 "Remove from list" = "从列表移除";
+"Remove location" = "去掉位置信息";
 "Rendering failed." = "渲染失败。";
 "Rendering preview…" = "正在生成预览…";
 "Resolution" = "输出分辨率";
@@ -214,6 +220,7 @@
 "This combination is not supported." = "这个组合不支持。";
 "This file type is not supported." = "不支持该文件类型。";
 "This image has no pixels to work with." = "这张图片没有可用的像素。";
+"This image has only one frame." = "这张图只有一帧。";
 "This page has an invalid size." = "页面尺寸异常。";
 "This photo does not fit on the selected paper." = "这张照片放不进所选的相纸。";
 "This photo is too small for the selected size." = "这张照片分辨率太低，不足以输出该规格。";
@@ -228,6 +235,7 @@
 "Web" = "网页";
 "White" = "白色";
 "Write a separate PDF every N pages." = "每 N 页输出一个独立的 PDF。";
+"Writes no camera, time or location information." = "不写入任何相机、时间或地点信息。";
 "Zero-pad page numbers (1 → 001)" = "页码补零（1 → 001）";
 "a square image, %d–%d px per side" = "边长 %d–%d 像素的正方形图片";
 "e.g. 1-3,5,8-10" = "例如 1-3,5,8-10";

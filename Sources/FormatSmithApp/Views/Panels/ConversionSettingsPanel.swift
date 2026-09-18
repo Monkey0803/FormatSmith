@@ -885,6 +885,29 @@ struct ConversionSettingsPanel: View {
             )
             .font(.system(size: 12))
 
+            if model.settingsScope.isActive(.metadata) {
+                Divider().padding(.vertical, 2)
+
+                Picker(
+                    "",
+                    selection: Binding(
+                        get: { model.settings.metadataPolicy },
+                        set: { model.settings.metadataPolicy = $0 }
+                    )
+                ) {
+                    ForEach(MetadataPolicy.allCases) { policy in
+                        Text(policy.displayName).tag(policy)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+
+                Text(model.settings.metadataPolicy.summary)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             Divider().padding(.vertical, 2)
 
             HStack(spacing: 8) {
