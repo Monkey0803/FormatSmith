@@ -118,7 +118,8 @@ public struct SettingsScope: Equatable, Sendable {
             // 合并、压缩、旋转都是把整份文件重新组织，给它们显示页码只会误导。
             guard hasPDFs, hasMultiPageInput else { return .inactive }
             if !targetIsPDF { return .active }
-            return pdfTool == .extract ? .active : .inactive
+            // 工具箱里按页码工作的只有这三个：提取、重排、删除
+            return pdfTool.usesPageSelection ? .active : .inactive
 
         case .pdfTool:
             return hasPDFs && targetIsPDF ? .active : .inactive

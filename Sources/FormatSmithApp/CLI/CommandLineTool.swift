@@ -135,10 +135,19 @@ enum CommandLineTool {
             case "--pdf-tool":
                 if let value = nextValue(argument) {
                     guard let tool = PDFTool(rawValue: value.lowercased()) else {
-                        fail("Unknown PDF tool: \(value). Use merge, split, extract, rotate or compress.")
+                        fail(
+                            "Unknown PDF tool: \(value). Use merge, split, extract, reorder, delete, rotate or compress."
+                        )
                     }
                     settings.target = .pdf
                     settings.pdfTool = tool
+                }
+
+            case "--page-order":
+                if let value = nextValue(argument) {
+                    settings.target = .pdf
+                    settings.pdfTool = .reorder
+                    settings.pageOrderText = value
                 }
 
             case "--split-every":
@@ -460,7 +469,8 @@ enum CommandLineTool {
               --background <c>      white | black | transparent
               --subfolder           Create a subfolder per source file
               PDF toolbox (input and output are both PDF):
-              --pdf-tool <tool>     merge | split | extract | rotate | compress
+              --pdf-tool <tool>     merge | split | extract | reorder | delete | rotate | compress
+              --page-order <list>   Page order for reorder, e.g. 3,1,2 (rest follow; nothing is dropped)
               --split-every <n>     Pages per file when splitting (default 1)
               --rotate <deg>        90 | 180 | 270
               --pages <range>       Page range used by --pdf-tool extract

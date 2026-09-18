@@ -130,6 +130,86 @@ public enum PDFToolkit {
         return try write(extracted, to: outputURL)
     }
 
+    // MARK: - 重排与删除
+
+    /// 按给定顺序重排：先放列出的页，其余的按原顺序接在后面。
+    ///
+    /// 刻意做成「不会丢页」：重排只负责挪位置，删页交给 `delete`。
+    /// 如果重排也允许丢页，用户一个笔误就会静默少几页。
+    @discardableResult
+    public static func reorder(
+        url: URL,
+        order: [Int],
+        to outputURL: URL,
+        cancellation: CancellationFlag = CancellationFlag(),
+        onPageCopied: ((Int, Int) -> Void)? = nil
+    ) throws -> URL {
+        guard let source = PDFDocument(url: url) else { throw ConversionError.unreadablePDF() }
+        let total = source.pageCount
+        guard total > 0 else { throw ConversionError.emptyPageRange() }
+
+        let wanted = order.filter { $0 >= 1 && $0 <= total }
+        guard !wanted.isEmpty else {
+            throw ConversionError(Localized.text("No pages were selected to move."))
+        }
+
+        // 列出的页按用户给的顺序在前，其余按原顺序跟随
+        let listed = Set(wanted)
+        let sequence = wanted + (1...total).filter { !listed.contains($0) }
+
+        return try copyPages(
+            from: source, sequence: sequence, to: outputURL,
+            cancellation: cancellation, onPageCopied: onPageCopied)
+    }
+
+    /// 删掉指定页面，其余保持原顺序。
+    @discardableResult
+    public static func delete(
+        url: URL,
+        pages: [Int],
+        to outputURL: URL,
+        cancellation: CancellationFlag = CancellationFlag(),
+        onPageCopied: ((Int, Int) -> Void)? = nil
+    ) throws -> URL {
+        guard let source = PDFDocument(url: url) else { throw ConversionError.unreadablePDF() }
+        let total = source.pageCount
+        guard total > 0 else { throw ConversionError.emptyPageRange() }
+
+        let removing = Set(pages.filter { $0 >= 1 && $0 <= total })
+        let sequence = (1...total).filter { !removing.contains($0) }
+        guard !sequence.isEmpty else {
+            // 全删光不是「删几页」，多半是把范围写错了
+            throw ConversionError(
+                Localized.text("That would remove every page; no pages were selected to delete.")
+            )
+        }
+
+        return try copyPages(
+            from: source, sequence: sequence, to: outputURL,
+            cancellation: cancellation, onPageCopied: onPageCopied)
+    }
+
+    /// 按给定页序复制出一个新文档。
+    private static func copyPages(
+        from source: PDFDocument,
+        sequence: [Int],
+        to outputURL: URL,
+        cancellation: CancellationFlag,
+        onPageCopied: ((Int, Int) -> Void)?
+    ) throws -> URL {
+        let output = PDFDocument()
+        var copied = 0
+        for pageNumber in sequence {
+            if cancellation.isCancelled { throw ConversionError(Localized.text("Cancelled.")) }
+            guard let page = source.page(at: pageNumber - 1) else { continue }
+            output.insert(page, at: copied)
+            copied += 1
+            onPageCopied?(copied, sequence.count)
+        }
+        guard output.pageCount > 0 else { throw ConversionError.emptyPageRange() }
+        return try write(output, to: outputURL)
+    }
+
     // MARK: - 旋转
 
     /// 在原有旋转基础上再转 `degrees` 度。

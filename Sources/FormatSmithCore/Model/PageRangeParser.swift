@@ -42,6 +42,45 @@ public enum PageRangeParser {
         return selected.sorted()
     }
 
+    /// 与 `parse` 同样的语法，但**保留书写顺序**。
+    ///
+    /// 给「重排」和「提取」用：`3,1` 的意思是「先放第 3 页，再放第 1 页」，
+    /// 而 `parse` 会按升序排成 1,3 —— 那样重排就完全失去意义了。
+    /// 重复出现的页码只保留第一次出现的位置。
+    public static func parseOrdered(_ text: String, pageCount: Int) -> [Int] {
+        guard pageCount > 0 else { return [] }
+
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return Array(1...pageCount) }
+
+        var ordered: [Int] = []
+        var seen = Set<Int>()
+
+        func append(_ page: Int) {
+            guard page >= 1, page <= pageCount, !seen.contains(page) else { return }
+            seen.insert(page)
+            ordered.append(page)
+        }
+
+        for chunk in normalize(trimmed).split(separator: ",") where !chunk.isEmpty {
+            let bounds = chunk.split(separator: "-", omittingEmptySubsequences: false)
+            switch bounds.count {
+            case 1:
+                if let page = Int(bounds[0]) { append(page) }
+            case 2:
+                let lower = Int(bounds[0]) ?? 1
+                let upper = Int(bounds[1]) ?? pageCount
+                let start = min(lower, upper)
+                let end = max(lower, upper)
+                // 区间内部保持自然顺序；写成 5-3 时按 3..5 展开，与 parse 一致
+                for page in start...max(start, end) { append(page) }
+            default:
+                continue
+            }
+        }
+        return ordered
+    }
+
     /// 判断这段文本是否「看起来合法」，用于 UI 提前给出提示。
     public static func validate(_ text: String, pageCount: Int) -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)

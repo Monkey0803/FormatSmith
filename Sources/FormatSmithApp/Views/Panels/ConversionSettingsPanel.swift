@@ -524,7 +524,14 @@ struct ConversionSettingsPanel: View {
                 "",
                 selection: Binding(
                     get: { model.settings.pdfTool },
-                    set: { model.settings.pdfTool = $0 }
+                    set: { tool in
+                        model.settings.pdfTool = tool
+                        // 提取/重排/删除都要一份页码清单；
+                        // 停在「全部」只会得到「全部删除」这种必然失败的状态，顺手切到自定义
+                        if tool.usesPageSelection, model.settings.pageRangeMode == .all {
+                            model.settings.pageRangeMode = .custom
+                        }
+                    }
                 )
             ) {
                 ForEach(PDFTool.allCases) { tool in
@@ -547,6 +554,10 @@ struct ConversionSettingsPanel: View {
                         .foregroundStyle(.tertiary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+
+            case .reorder, .delete:
+                // 页码清单统一在「页面」卡片里填，这里不重复
+                EmptyView()
 
             case .split:
                 HStack(spacing: 8) {
@@ -621,21 +632,53 @@ struct ConversionSettingsPanel: View {
 
     private var pageRangeSection: some View {
         SettingsCard(title: Localized.text("Pages"), systemImage: "doc.on.doc") {
-            Picker(
-                "",
-                selection: Binding(
-                    get: { model.settings.pageRangeMode },
-                    set: { model.settings.pageRangeMode = $0 }
-                )
-            ) {
-                ForEach(PageRangeMode.allCases) { mode in
-                    Text(mode.displayName).tag(mode)
+            if model.settings.pdfTool == .reorder {
+                // 重排必须给出顺序，没有「全部」可选
+                Text(Localized.text("Page order"))
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            } else {
+                Picker(
+                    "",
+                    selection: Binding(
+                        get: { model.settings.pageRangeMode },
+                        set: { model.settings.pageRangeMode = $0 }
+                    )
+                ) {
+                    ForEach(PageRangeMode.allCases) { mode in
+                        Text(mode.displayName).tag(mode)
+                    }
                 }
+                .labelsHidden()
+                .pickerStyle(.segmented)
             }
-            .labelsHidden()
-            .pickerStyle(.segmented)
 
-            if model.settings.pageRangeMode == .custom {
+            // 重排用的是另一份清单：给的是「顺序」，不是「保留哪些」
+            if model.settings.pdfTool == .reorder {
+                TextField(
+                    Localized.text("e.g. 3,1,2"),
+                    text: Binding(
+                        get: { model.settings.pageOrderText },
+                        set: { model.settings.pageOrderText = $0 }
+                    )
+                )
+                .textFieldStyle(.roundedBorder)
+                .font(.system(size: 12, design: .monospaced))
+
+                Text(
+                    Localized.text(
+                        "Listed pages move to the front; the rest follow in their original order. No page is dropped.")
+                )
+                .font(.system(size: 10))
+                .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+
+                if model.settings.pageOrder(outOf: referencePageCount).isEmpty {
+                    Label(Localized.text("No page matches this range."), systemImage: "exclamationmark.circle")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.orange)
+                }
+            } else if model.settings.pageRangeMode == .custom {
                 TextField(
                     Localized.text("e.g. 1-3,5,8-10"),
                     text: Binding(
@@ -650,9 +693,15 @@ struct ConversionSettingsPanel: View {
                         .font(.system(size: 11))
                         .foregroundStyle(.orange)
                 } else {
-                    Text(Localized.text("One image per page, numbered from 1."))
-                        .font(.system(size: 11))
-                        .foregroundStyle(.tertiary)
+                    // 同一个输入框在「提取」和「删除」下含义不同，标签必须跟着变
+                    Text(
+                        model.settings.pdfTool == .delete
+                            ? Localized.text("These pages are removed; the rest keep their order.")
+                            : Localized.text("These pages are kept, in the order you write them.")
+                    )
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
             }
 
@@ -1062,6 +1111,12 @@ struct ConversionSettingsPanel: View {
         case .extract:
             let selected = model.settings.pages(outOf: pageCount).count
             return Localized.text("%d of %d page(s)", selected, pageCount)
+        case .reorder:
+            let listed = model.settings.pageOrder(outOf: pageCount).count
+            return Localized.text("%d page(s), %d moved to the front", pageCount, listed)
+        case .delete:
+            let removing = model.settings.pages(outOf: pageCount).count
+            return Localized.text("%d of %d page(s) kept", max(pageCount - removing, 0), pageCount)
         case .rotate:
             return Localized.text("%d page(s)", pageCount)
         case .compress:

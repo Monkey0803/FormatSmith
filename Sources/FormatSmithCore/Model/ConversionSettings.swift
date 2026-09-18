@@ -112,6 +112,8 @@ public struct ConversionSettings: Codable, Equatable, Sendable {
     public var pageRangeMode: PageRangeMode = .all
     /// 形如 "1-3,5,8-10"。
     public var pageRangeText: String = ""
+    /// 重排时给出的页序，例如 "3,1,2"。没列出的页按原顺序接在后面。
+    public var pageOrderText: String = ""
 
     // 输出位置与命名
     public var outputDirectoryPath: String = ""
@@ -257,6 +259,24 @@ public struct ConversionSettings: Codable, Equatable, Sendable {
             return pageCount > 0 ? Array(1...pageCount) : []
         case .custom:
             return PageRangeParser.parse(pageRangeText, pageCount: pageCount)
+        }
+    }
+
+    /// 重排用的页序。
+    ///
+    /// 只解析出用户列出的页；补全「其余页跟在后面」是工具箱的事，
+    /// 这样这里保持纯粹：给什么就是什么。
+    public func pageOrder(outOf pageCount: Int) -> [Int] {
+        PageRangeParser.parseOrdered(pageOrderText, pageCount: pageCount)
+    }
+
+    /// 「提取」用的页序：保留书写顺序，`3,1` 就是先 3 后 1。
+    public func selectedPagesInOrder(outOf pageCount: Int) -> [Int] {
+        switch pageRangeMode {
+        case .all:
+            return pageCount > 0 ? Array(1...pageCount) : []
+        case .custom:
+            return PageRangeParser.parseOrdered(pageRangeText, pageCount: pageCount)
         }
     }
 

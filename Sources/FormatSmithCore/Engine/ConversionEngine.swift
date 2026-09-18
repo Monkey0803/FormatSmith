@@ -400,7 +400,8 @@ public enum ConversionEngine {
             case .extract:
                 let folder = try outputFolder(for: first, settings: settings)
                 let pageCount = PDFRasterizer.pageCount(of: first.url)
-                let pages = settings.pages(outOf: pageCount)
+                // 保留书写顺序：写 3,1 就是要先 3 后 1
+                let pages = settings.selectedPagesInOrder(outOf: pageCount)
                 let observerBox = ProgressReporter(observer: observer, fileIndex: fileIndex, fileCount: fileCount)
                 let url = try PDFToolkit.extract(
                     url: first.url,
@@ -414,6 +415,46 @@ public enum ConversionEngine {
                     outputFiles: [url],
                     outputFolder: folder,
                     producedCount: pages.count,
+                    duration: Date().timeIntervalSince(started)
+                )
+
+            case .reorder:
+                let folder = try outputFolder(for: first, settings: settings)
+                let pageCount = PDFRasterizer.pageCount(of: first.url)
+                let order = settings.pageOrder(outOf: pageCount)
+                let observerBox = ProgressReporter(observer: observer, fileIndex: fileIndex, fileCount: fileCount)
+                let url = try PDFToolkit.reorder(
+                    url: first.url,
+                    order: order,
+                    to: folder.appendingPathComponent(pdfFileName(for: first, settings: settings)),
+                    cancellation: cancellation,
+                    onPageCopied: { done, total in observerBox.report(completed: done, total: total) }
+                )
+                return ConversionResult(
+                    documentID: primaryID,
+                    outputFiles: [url],
+                    outputFolder: folder,
+                    producedCount: pageCount,
+                    duration: Date().timeIntervalSince(started)
+                )
+
+            case .delete:
+                let folder = try outputFolder(for: first, settings: settings)
+                let pageCount = PDFRasterizer.pageCount(of: first.url)
+                let removing = settings.pages(outOf: pageCount)
+                let observerBox = ProgressReporter(observer: observer, fileIndex: fileIndex, fileCount: fileCount)
+                let url = try PDFToolkit.delete(
+                    url: first.url,
+                    pages: removing,
+                    to: folder.appendingPathComponent(pdfFileName(for: first, settings: settings)),
+                    cancellation: cancellation,
+                    onPageCopied: { done, total in observerBox.report(completed: done, total: total) }
+                )
+                return ConversionResult(
+                    documentID: primaryID,
+                    outputFiles: [url],
+                    outputFolder: folder,
+                    producedCount: max(pageCount - removing.count, 0),
                     duration: Date().timeIntervalSince(started)
                 )
 

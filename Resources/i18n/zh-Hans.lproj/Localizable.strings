@@ -16,11 +16,13 @@
 "%d image(s) · %@" = "%d 张图片 · %@";
 "%d megapixels is over the %d megapixel safety limit — lower the DPI or scale." = "%d 百万像素，超过 %d 百万像素的安全上限，请降低 DPI 或倍数。";
 "%d of %d page(s)" = "共 %d 页中的 %d 页";
+"%d of %d page(s) kept" = "保留 %d / %d 页";
 "%d page(s)" = "共 %d 页";
 "%d page(s) at %d DPI" = "%d 页 · %d DPI";
 "%d page(s) · ready" = "%d 页 · 就绪";
 "%d page(s) → %d file(s)" = "%d 页 → %d 个文件";
 "%d page(s) → 1 file" = "%d 页 → 1 个文件";
+"%d page(s), %d moved to the front" = "%d 页，其中 %d 页移到最前";
 "%d succeeded" = "成功 %d 个";
 "%d × %d mm paper · %d photos per sheet" = "%d × %d 毫米相纸 · 每张 %d 张照片";
 "1-inch" = "一寸";
@@ -83,12 +85,14 @@
 "Create PDF" = "生成 PDF";
 "Custom" = "自定义";
 "Cut guides" = "裁切辅助线";
+"Delete pages" = "删除页面";
 "Dismiss" = "关闭";
 "Documents" = "文档";
 "Done · %d image(s) written" = "完成 · 已输出 %d 张图片";
 "Drag the output folder out, or click to show it in Finder" = "可拖出输出文件夹，点击则在访达中显示";
 "Drag the result out, or click to show it in Finder" = "可直接拖出结果，点击则在访达中显示";
 "Drop files here" = "把文件拖到这里";
+"Drop the pages you list; nothing else moves." = "删掉列出的页，其余保持原顺序。";
 "Each image" = "单张尺寸";
 "Each image gets its own page." = "每张图片单独占一页。";
 "Each page matches its image: 1 pixel = 1 point." = "页面与图片尺寸一致：1 像素 = 1 点。";
@@ -126,6 +130,7 @@
 "Large 1-inch / passport" = "大一寸 / 小二寸 / 护照";
 "Large 2-inch" = "大二寸";
 "Larger outputs than this are refused before any work starts." = "超过这个像素数的输出会在开始前被拒绝。";
+"Listed pages move to the front; the rest follow in their original order. No page is dropped." = "列出的页移到最前，其余按原顺序跟随；不会丢页。";
 "Longest edge" = "最长边";
 "Lossless" = "无损";
 "Lossy" = "有损";
@@ -136,9 +141,11 @@
 "Merge all images into one PDF" = "把所有图片合并成一个 PDF";
 "Missing tools" = "缺少依赖";
 "Move down" = "下移";
+"Move the pages you list to the front; the rest follow in order." = "把列出的页移到最前，其余按原顺序跟随。";
 "Move up" = "上移";
 "No face was detected, so the photo was centred instead." = "没有检测到人脸，已改为居中构图。";
 "No page matches this range." = "没有页码落在该范围内。";
+"No pages were selected to move." = "没有选中要移动的页。";
 "No person was detected, so the original background was kept." = "没有检测到人像，已保留原背景。";
 "No transparency" = "不支持透明";
 "Not available in this build yet." = "当前版本尚未提供该功能。";
@@ -146,7 +153,6 @@
 "One PDF per source file." = "每个源文件输出一个 PDF。";
 "One PDF, one page per image, at original size" = "合成一个 PDF，每张图片一页，保持原始尺寸";
 "One image" = "一张图片";
-"One image per page, numbered from 1." = "每页输出一张图片，页码从 1 开始。";
 "One page" = "一页";
 "One per page" = "每页一张";
 "Only shrinks — a smaller image is never enlarged." = "只会缩小，比它小的图不会被放大。";
@@ -165,6 +171,7 @@
 "PNG at 2× — crisp on Retina screens" = "2 倍 PNG，在高分屏上更清晰";
 "PNG at original size, nothing thrown away" = "原始尺寸 PNG，不做任何有损处理";
 "PNG per page at 150 DPI" = "每页一张 PNG，150 DPI";
+"Page order" = "页面顺序";
 "Page ranges apply to PDF input only; images are always exported whole." = "页码范围仅对 PDF 生效，图片始终整张导出。";
 "Pages" = "页面范围";
 "Pages per file" = "每个文件的页数";
@@ -187,6 +194,7 @@
 "Remove location" = "去掉位置信息";
 "Rendering failed." = "渲染失败。";
 "Rendering preview…" = "正在生成预览…";
+"Reorder pages" = "重排页面";
 "Resolution" = "输出分辨率";
 "Result" = "结果";
 "Retry failed" = "重试失败的";
@@ -204,6 +212,7 @@
 "Switches immediately; no restart needed." = "切换后立即生效，无需重启。";
 "TIFF at 300 DPI, lossless" = "300 DPI 无损 TIFF";
 "Text" = "文本";
+"That would remove every page; no pages were selected to delete." = "这会把所有页面都删掉：没有选中要删除的页。";
 "The computed output size is invalid. Lower the resolution." = "计算出的尺寸无效，请降低分辨率。";
 "The converter did not finish in time." = "转换器没有在限定时间内完成。";
 "The converter did not finish within %d seconds." = "转换器在 %d 秒内没有完成。";
@@ -213,6 +222,8 @@
 "The page range is empty or invalid." = "页码范围为空或不合法。";
 "The subject is cut out with on-device person segmentation." = "人像用系统本地的人像分割自动抠出，照片不会离开这台机器。";
 "There is nothing to convert." = "没有可转换的文件。";
+"These pages are kept, in the order you write them." = "保留这些页，顺序按你写的来。";
+"These pages are removed; the rest keep their order." = "这些页会被删除，其余保持原顺序。";
 "This Mac cannot read %@ files." = "这台 Mac 无法读取 %@ 文件。";
 "This Mac cannot write %@ files." = "本机无法写出 %@ 文件。";
 "This PDF has no pages." = "这个 PDF 没有页面。";
@@ -239,5 +250,6 @@
 "Zero-pad page numbers (1 → 001)" = "页码补零（1 → 001）";
 "a square image, %d–%d px per side" = "边长 %d–%d 像素的正方形图片";
 "e.g. 1-3,5,8-10" = "例如 1-3,5,8-10";
+"e.g. 3,1,2" = "例如 3,1,2";
 "margin" = "页边距";
 "points" = "点";
