@@ -108,7 +108,26 @@ struct EmptyDropZone: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
+
+                // 首次使用最需要知道的三件事
+                VStack(alignment: .leading, spacing: 4) {
+                    Label(
+                        Localized.text("1. Drop files here, or press ⌘O"),
+                        systemImage: "1.circle"
+                    )
+                    Label(
+                        Localized.text("2. Pick a preset on the right, or fine-tune the settings"),
+                        systemImage: "2.circle"
+                    )
+                    Label(
+                        Localized.text("3. Press ⌘⏎ to convert — everything stays on this Mac"),
+                        systemImage: "3.circle"
+                    )
+                }
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .padding(.top, 6)
+                .padding(.horizontal, 32)
             }
 
             Button {

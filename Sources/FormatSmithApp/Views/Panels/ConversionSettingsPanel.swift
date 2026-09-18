@@ -555,8 +555,8 @@ struct ConversionSettingsPanel: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-            case .reorder, .delete:
-                // 页码清单统一在「页面」卡片里填，这里不重复
+            case .reorder, .delete, .ocr:
+                // 页码清单统一在「页面」卡片里填；OCR 没有额外参数
                 EmptyView()
 
             case .split:
@@ -1111,6 +1111,8 @@ struct ConversionSettingsPanel: View {
         case .extract:
             let selected = model.settings.pages(outOf: pageCount).count
             return Localized.text("%d of %d page(s)", selected, pageCount)
+        case .ocr:
+            return Localized.text("%d page(s) to recognise", pageCount)
         case .reorder:
             let listed = model.settings.pageOrder(outOf: pageCount).count
             return Localized.text("%d page(s), %d moved to the front", pageCount, listed)

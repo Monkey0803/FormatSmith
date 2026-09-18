@@ -95,6 +95,8 @@ final class ConverterModel: ObservableObject {
     @Published var outputPreview = OutputPreviewState()
     /// 上一轮转换的结果汇总；开跑新一轮时清空。
     @Published var batchSummary: BatchSummary?
+    /// 是否展示「关于」面板。
+    @Published var showsAbout = false
     /// 是否展开长尾格式。
     @Published var showsAllFormats = false
     /// 界面语言。改动会立刻生效（根视图用它的值做 id，从而重建整棵视图树）。

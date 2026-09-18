@@ -26,6 +26,9 @@ struct ContentView: View {
             }
         }
         .localizedText(model.language)
+        .sheet(isPresented: $model.showsAbout) {
+            AboutView()
+        }
     }
 }
 

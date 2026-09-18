@@ -418,6 +418,25 @@ public enum ConversionEngine {
                     duration: Date().timeIntervalSince(started)
                 )
 
+            case .ocr:
+                let folder = try outputFolder(for: first, settings: settings)
+                let pageCount = PDFRasterizer.pageCount(of: first.url)
+                let observerBox = ProgressReporter(observer: observer, fileIndex: fileIndex, fileCount: fileCount)
+                let url = try PDFToolkit.makeSearchable(
+                    url: first.url,
+                    settings: settings,
+                    to: folder.appendingPathComponent(pdfFileName(for: first, settings: settings)),
+                    cancellation: cancellation,
+                    onPageDone: { done, total in observerBox.report(completed: done, total: total) }
+                )
+                return ConversionResult(
+                    documentID: primaryID,
+                    outputFiles: [url],
+                    outputFolder: folder,
+                    producedCount: pageCount,
+                    duration: Date().timeIntervalSince(started)
+                )
+
             case .reorder:
                 let folder = try outputFolder(for: first, settings: settings)
                 let pageCount = PDFRasterizer.pageCount(of: first.url)

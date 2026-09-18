@@ -26,6 +26,10 @@ struct FormatSmithApp: App {
         .defaultSize(width: 1040, height: 680)
         .windowResizability(.contentMinSize)
         .commands {
+            // 用自己的「关于」：版本、仓库地址、以及「文件不出这台机器」这件事
+            CommandGroup(replacing: .appInfo) {
+                Button(Localized.text("About FormatSmith")) { model.showsAbout = true }
+            }
             CommandGroup(replacing: .newItem) {
                 Button(Localized.text("Choose Files…")) { model.chooseInputFiles() }
                     .keyboardShortcut("o", modifiers: .command)

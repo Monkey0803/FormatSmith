@@ -130,6 +130,67 @@ public enum PDFToolkit {
         return try write(extracted, to: outputURL)
     }
 
+    // MARK: - 可搜索 PDF
+
+    /// 逐页栅格化 + 识别文字 + 叠透明文字层，重建为可搜索 PDF。
+    ///
+    /// 会丢失原有的文字层与矢量（本来就以扫描件为主，代价可以接受），
+    /// 所以它和压缩一样被标成有损操作。
+    @discardableResult
+    public static func makeSearchable(
+        url: URL,
+        settings: ConversionSettings,
+        recognizer: TextRecognizing = VisionTextRecognizer(),
+        to outputURL: URL,
+        cancellation: CancellationFlag = CancellationFlag(),
+        onPageDone: ((Int, Int) -> Void)? = nil
+    ) throws -> URL {
+        let source = try PDFRasterizer.open(url)
+        let pageCount = source.numberOfPages
+        guard pageCount > 0 else { throw ConversionError.emptyPageRange() }
+
+        let directory = outputURL.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let target = OutputNaming.uniqueURL(outputURL)
+
+        let scale = max(settings.dpi, 72) / 72.0
+        let firstPage = source.page(at: 1)
+        let firstBox = firstPage?.getBoxRect(.mediaBox) ?? CGRect(x: 0, y: 0, width: 595, height: 842)
+        var mediaBox = firstBox
+
+        guard let context = CGContext(target as CFURL, mediaBox: &mediaBox, nil) else {
+            throw ConversionError(Localized.text("Could not create the PDF context."))
+        }
+
+        for index in 1...pageCount {
+            if cancellation.isCancelled {
+                context.closePDF()
+                try? FileManager.default.removeItem(at: target)
+                throw ConversionError(Localized.text("Cancelled."))
+            }
+            guard let page = source.page(at: index) else { continue }
+            let box = page.getBoxRect(.mediaBox)
+
+            let rendered = try PDFRasterizer.render(
+                page: page, scale: scale, background: .white, format: .png, maxPixels: settings.maxPixels
+            )
+            let lines = (try? recognizer.lines(in: rendered)) ?? []
+
+            var pageBox = box
+            let boxData = NSData(bytes: &pageBox, length: MemoryLayout<CGRect>.size)
+            context.beginPDFPage([kCGPDFContextMediaBox as String: boxData] as CFDictionary)
+            context.interpolationQuality = .high
+            context.draw(rendered, in: box)
+            SearchableTextLayer.draw(lines: lines, in: context, box: box)
+            context.endPDFPage()
+
+            onPageDone?(index, pageCount)
+        }
+
+        context.closePDF()
+        return target
+    }
+
     // MARK: - 重排与删除
 
     /// 按给定顺序重排：先放列出的页，其余的按原顺序接在后面。

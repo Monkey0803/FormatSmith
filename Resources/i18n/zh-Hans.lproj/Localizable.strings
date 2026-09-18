@@ -19,6 +19,7 @@
 "%d of %d page(s) kept" = "保留 %d / %d 页";
 "%d page(s)" = "共 %d 页";
 "%d page(s) at %d DPI" = "%d 页 · %d DPI";
+"%d page(s) to recognise" = "识别 %d 页";
 "%d page(s) · ready" = "%d 页 · 就绪";
 "%d page(s) → %d file(s)" = "%d 页 → %d 个文件";
 "%d page(s) → 1 file" = "%d 页 → 1 个文件";
@@ -27,15 +28,19 @@
 "%d × %d mm paper · %d photos per sheet" = "%d × %d 毫米相纸 · 每张 %d 张照片";
 "1-inch" = "一寸";
 "1-inch photo, blue background, 300 DPI" = "一寸照、蓝底、300 DPI";
+"1. Drop files here, or press ⌘O" = "1. 把文件拖到这里，或按 ⌘O 选择";
 "180°" = "180°";
 "2-inch" = "二寸";
+"2. Pick a preset on the right, or fine-tune the settings" = "2. 在右侧选一个预设，或逐项微调";
 "3-inch" = "三寸";
+"3. Press ⌘⏎ to convert — everything stays on this Mac" = "3. 按 ⌘⏎ 开始转换 —— 全程不离开这台 Mac";
 "300 DPI is the usual choice for printing" = "打印通常用 300 DPI";
 "5-inch paper" = "5 寸相纸";
 "6-inch paper" = "6 寸相纸";
 "72–150 screen · 300 print · 600 archival" = "屏幕 72–150 · 打印 300 · 归档 600";
 "90° clockwise" = "顺时针 90°";
 "90° counter-clockwise" = "逆时针 90°";
+"About FormatSmith" = "关于 FormatSmith";
 "Add" = "添加";
 "Add a file to see the estimated output." = "添加文件后显示输出预估。";
 "Add at least two PDFs to merge; with one file this just copies it." = "至少需要两个 PDF 才能合并；只有一个文件时等同于复制。";
@@ -88,6 +93,7 @@
 "Delete pages" = "删除页面";
 "Dismiss" = "关闭";
 "Documents" = "文档";
+"Done" = "完成";
 "Done · %d image(s) written" = "完成 · 已输出 %d 张图片";
 "Drag the output folder out, or click to show it in Finder" = "可拖出输出文件夹，点击则在访达中显示";
 "Drag the result out, or click to show it in Finder" = "可直接拖出结果，点击则在访达中显示";
@@ -97,6 +103,7 @@
 "Each image gets its own page." = "每张图片单独占一页。";
 "Each page matches its image: 1 pixel = 1 point." = "页面与图片尺寸一致：1 像素 = 1 点。";
 "Email" = "邮件";
+"Every conversion runs on this Mac. Files are never uploaded anywhere." = "所有转换都在这台 Mac 上完成，文件不会被上传到任何地方。";
 "Everything else works without it." = "其余功能不受影响。";
 "Example name" = "示例文件名";
 "Extract pages" = "提取页面";
@@ -134,7 +141,9 @@
 "Longest edge" = "最长边";
 "Lossless" = "无损";
 "Lossy" = "有损";
+"MIT licensed. Built with SwiftUI, PDFKit and Vision." = "MIT 许可。使用 SwiftUI、PDFKit 与 Vision 构建。";
 "Make an ID photo" = "按证件照处理";
+"Make searchable" = "做成可搜索 PDF";
 "Margin" = "页边距";
 "Match image" = "跟随图片";
 "Merge" = "合并";
@@ -187,7 +196,9 @@
 "Rasterise pages at a lower resolution to shrink the file." = "以较低分辨率重新栅格化，换取更小的文件。";
 "Reading…" = "正在读取…";
 "Ready" = "就绪";
+"Recognise the text on every page and add an invisible layer, so scans become searchable." = "识别每一页的文字并叠加一层看不见的文字层，扫描件即可被搜索。";
 "Red" = "红底";
+"Release notes and downloads" = "发行说明与下载";
 "Release to add" = "松开以添加";
 "Remove all metadata" = "去掉全部元数据";
 "Remove from list" = "从列表移除";
@@ -206,6 +217,7 @@
 "Show fewer" = "收起";
 "Show in Finder" = "在访达中显示";
 "Small 1-inch" = "小一寸";
+"Source code on GitHub" = "GitHub 上的源代码";
 "Split" = "拆分";
 "Subfolder per source file" = "每个源文件单独建子文件夹";
 "Supports transparency" = "支持透明";
@@ -243,6 +255,7 @@
 "US visa" = "美国签证";
 "Unknown" = "未知";
 "Use Desktop" = "恢复默认（桌面）";
+"Version %@" = "版本 %@";
 "Web" = "网页";
 "White" = "白色";
 "Write a separate PDF every N pages." = "每 N 页输出一个独立的 PDF。";

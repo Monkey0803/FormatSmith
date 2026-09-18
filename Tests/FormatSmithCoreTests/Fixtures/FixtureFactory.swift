@@ -1,4 +1,5 @@
 import CoreGraphics
+import CoreText
 import FormatSmithCore
 import Foundation
 import ImageIO
@@ -124,6 +125,36 @@ enum FixtureFactory {
         guard let image = context.makeImage() else { throw FixtureError.cannotCreateContext }
         let url = directory.appendingPathComponent("\(name).png")
         try ImageEncoder.encode(image, format: .png, quality: 1.0).write(to: url)
+        return url
+    }
+
+    /// 生成一张白底黑字的图，用来给 OCR 认。
+    @discardableResult
+    static func makeTextImage(
+        _ text: String,
+        width: Int = 900,
+        height: Int = 300,
+        named name: String,
+        in directory: URL
+    ) throws -> URL {
+        let context = try BitmapContext.make(width: width, height: height, wantsAlpha: false)
+        context.fill(with: .white)
+        let font = CTFontCreateWithName("Helvetica-Bold" as CFString, 56, nil)
+        let attributes: [NSAttributedString.Key: Any] = [
+            NSAttributedString.Key(kCTFontAttributeName as String): font,
+            NSAttributedString.Key(kCTForegroundColorAttributeName as String): CGColor(
+                red: 0, green: 0, blue: 0, alpha: 1
+            ),
+        ]
+        let line = CTLineCreateWithAttributedString(
+            NSAttributedString(string: text, attributes: attributes)
+        )
+        context.textPosition = CGPoint(x: 40, y: CGFloat(height) / 2 - 28)
+        CTLineDraw(line, context)
+
+        guard let image = context.makeImage() else { throw FixtureError.cannotCreateContext }
+        let url = directory.appendingPathComponent("\(name).png")
+        try ImageEncoder.encode(image, format: .png, quality: 1).write(to: url)
         return url
     }
 

@@ -18,6 +18,8 @@ public enum PDFTool: String, Codable, CaseIterable, Identifiable, Sendable {
     case rotate
     /// 重新以较低分辨率栅格化，换取更小的文件。
     case compress
+    /// 识别文字，叠一层透明文字层，做成可搜索 PDF。
+    case ocr
 
     public var id: String { rawValue }
 
@@ -30,6 +32,7 @@ public enum PDFTool: String, Codable, CaseIterable, Identifiable, Sendable {
         case .delete: return Localized.text("Delete pages")
         case .rotate: return Localized.text("Rotate")
         case .compress: return Localized.text("Compress")
+        case .ocr: return Localized.text("Make searchable")
         }
     }
 
@@ -42,12 +45,17 @@ public enum PDFTool: String, Codable, CaseIterable, Identifiable, Sendable {
         case .delete: return Localized.text("Drop the pages you list; nothing else moves.")
         case .rotate: return Localized.text("Turn every page by a fixed angle.")
         case .compress: return Localized.text("Rasterise pages at a lower resolution to shrink the file.")
+        case .ocr:
+            return Localized.text(
+                "Recognise the text on every page and add an invisible layer, so scans become searchable."
+            )
         }
     }
 
     /// 是否会丢失文本层与矢量信息（压缩会）。
     public var isLossy: Bool {
-        self == .compress
+        // 两者都会栅格化：原有的矢量与文字层会被重建
+        self == .compress || self == .ocr
     }
 
     /// 该操作是否需要把整批输入当成一个文档处理。
