@@ -71,6 +71,11 @@ enum CommandLineTool {
                     }
                 }
 
+            case "--max-edge":
+                if let value = nextValue(argument), let number = Int(value) {
+                    settings.maxLongEdge = max(0, number)
+                }
+
             case "--quality":
                 if let value = nextValue(argument), let number = Double(value) {
                     settings.quality = min(max(number, 0.05), 1)
@@ -440,6 +445,7 @@ enum CommandLineTool {
               --quality <0.05-1>    Quality for lossy formats (default 0.9)
               --dpi <number>        Render PDFs at this DPI (default 200). PDF input only
               --scale <number>      Output size factor for images: 1 = original, 2 = 200%
+              --max-edge <px>       Cap the longest edge for images (e.g. 1600); never enlarges
                                     (for PDF input this is an alternative to --dpi)
               --pages <range>       PDF page range such as 1-3,5,8-10 (default: all)
               --out <dir>           Output directory (default: current directory)

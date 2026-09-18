@@ -9,31 +9,37 @@ struct ConversionSettingsPanel: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+                let scope = model.settingsScope
                 presetSection
                 targetSection
                 if !model.missingRequiredTools.isEmpty {
                     dependencySection
                 }
-                if model.target.isPDF {
-                    if model.hasPDFInputs {
-                        pdfToolSection
-                    }
-                    if model.hasImageInputs {
-                        // 证件照设置对「图片 → PDF」同样生效，所以也要显示出来——
-                        // 否则用户看不到它开着，只会看到输出多了一层底色。
-                        idPhotoSection
-                        pdfLayoutSection
-                        pdfCompressionSection
-                    }
-                } else {
-                    idPhotoSection
-                    qualitySection
-                    if !model.settings.idPhotoEnabled {
-                        resolutionSection
-                        backgroundSection
-                    }
+                // 某个分区出不出现，取决于「这项设置对当前这批文件是否生效」——
+                // 与引擎实际的判断是同一处规则（SettingsScope），并有测试守着：
+                // 凡是判为不生效的设置，改动之后产出必须一模一样。
+                if scope.isActive(.pdfTool) {
+                    pdfToolSection
                 }
-                if showPageRangeSection {
+                if scope.isActive(.idPhoto) {
+                    idPhotoSection
+                }
+                if scope.isActive(.quality) {
+                    qualitySection
+                }
+                if scope.isActive(.resolution) {
+                    resolutionSection
+                }
+                if scope.isActive(.background) {
+                    backgroundSection
+                }
+                if scope.isActive(.pdfLayout) {
+                    pdfLayoutSection
+                }
+                if scope.isActive(.pdfCompression) {
+                    pdfCompressionSection
+                }
+                if scope.isActive(.pageRange) {
                     pageRangeSection
                 }
                 outputSection
@@ -312,8 +318,7 @@ struct ConversionSettingsPanel: View {
                     Spacer()
                 }
 
-                if !model.target.isPDF {
-                    // 相纸排版产出的是图片，PDF 目标下用不上
+                if model.settingsScope.isActive(.photoSheet) {
                     Divider().padding(.vertical, 2)
                     printSheetControls
                 }
@@ -449,6 +454,36 @@ struct ConversionSettingsPanel: View {
                         .font(.system(size: 10))
                         .foregroundStyle(.tertiary)
                         .fixedSize(horizontal: false, vertical: true)
+
+                    // 证件照模式下尺寸由规格决定，最长边不起作用，就不该显示
+                    if model.settingsScope.isActive(.maxLongEdge) {
+                        HStack(spacing: 8) {
+                            Text(Localized.text("Longest edge"))
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                            Picker(
+                                "",
+                                selection: Binding(
+                                    get: { model.settings.maxLongEdge },
+                                    set: { model.settings.maxLongEdge = $0 }
+                                )
+                            ) {
+                                Text(Localized.text("Original")).tag(0)
+                                ForEach([1600, 2048, 4096], id: \.self) { edge in
+                                    Text(verbatim: "\(edge) px").tag(edge)
+                                }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                            .frame(width: 110)
+                            Spacer(minLength: 4)
+                        }
+
+                        Text(Localized.text("Only shrinks — a smaller image is never enlarged."))
+                            .font(.system(size: 10))
+                            .foregroundStyle(.tertiary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
         }
@@ -479,15 +514,6 @@ struct ConversionSettingsPanel: View {
                     .foregroundStyle(.tertiary)
             }
         }
-    }
-
-    /// 页码范围在两种情况下有意义：PDF 转图片，以及 PDF 工具箱里的「提取页」。
-    private var showPageRangeSection: Bool {
-        guard model.hasPDFInputs else { return false }
-        if model.target.isPDF {
-            return model.settings.pdfTool == .extract
-        }
-        return true
     }
 
     // MARK: PDF 工具箱

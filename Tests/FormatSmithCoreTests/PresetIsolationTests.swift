@@ -235,6 +235,36 @@ final class NewPresetBehaviourTests: XCTestCase {
         }
     }
 
+    func testEmailPresetActuallyShrinksALargePhoto() throws {
+        // 这个预设写的是「小到能当附件」。以前只换格式与质量，尺寸一个像素没动，
+        // 8000px 的照片原样产出，根本算不上「小」。
+        let url = try FixtureFactory.makeImage(width: 4000, height: 3000, named: "big", in: directory)
+
+        var settings = try preset("email").applied(to: ConversionSettings())
+        settings.outputDirectoryPath = output.path
+        settings.perFileSubfolder = false
+        settings.filenamePattern = "mail"
+
+        let result = ConversionEngine.convert(
+            document: SourceDocument.make(from: url),
+            target: settings.target,
+            settings: settings,
+            cancellation: CancellationFlag()
+        )
+        XCTAssertNil(result.error)
+
+        let source = try XCTUnwrap(
+            CGImageSourceCreateWithURL(try XCTUnwrap(result.outputFiles.first) as CFURL, nil)
+        )
+        let image = try XCTUnwrap(CGImageSourceCreateImageAtIndex(source, 0, nil))
+        XCTAssertEqual(max(image.width, image.height), 1600, "邮件预设应当把最长边限制在 1600")
+    }
+
+    func testWebPresetCapsTheLongestEdge() throws {
+        let settings = try preset("web").applied(to: ConversionSettings())
+        XCTAssertEqual(settings.maxLongEdge, 2048)
+    }
+
     func testPrintPresetStaysLosslessImage() throws {
         // 「打印」产出的是 TIFF 母版，不是 PDF：说明文案里写清楚了，
         // 而「图片合成 PDF」是另一个独立预设

@@ -122,6 +122,7 @@
 "Large 1-inch / passport" = "大一寸 / 小二寸 / 护照";
 "Large 2-inch" = "大二寸";
 "Larger outputs than this are refused before any work starts." = "超过这个像素数的输出会在开始前被拒绝。";
+"Longest edge" = "最长边";
 "Lossless" = "无损";
 "Lossy" = "有损";
 "Make an ID photo" = "按证件照处理";
@@ -144,10 +145,12 @@
 "One image per page, numbered from 1." = "每页输出一张图片，页码从 1 开始。";
 "One page" = "一页";
 "One per page" = "每页一张";
+"Only shrinks — a smaller image is never enlarged." = "只会缩小，比它小的图不会被放大。";
 "Open" = "打开";
 "Open Output Folder" = "打开输出文件夹";
 "Open output folder" = "打开输出目录";
 "Open output folder when finished" = "完成后打开输出文件夹";
+"Original" = "原始尺寸";
 "Output" = "输出";
 "Output format" = "输出格式";
 "PDF page" = "PDF 页面";

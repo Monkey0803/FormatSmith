@@ -188,7 +188,7 @@ public enum OutputPreview {
         let shrink = area > Double(maxPixels) ? (Double(maxPixels) / area).squareRoot() : 1
         let decoded = try ImageDecoder.decode(
             url: document.url,
-            scale: settings.imageScale * shrink,
+            scale: settings.imageScale(for: document.info) * shrink,
             maxPixels: settings.maxPixels
         )
         let prepared = try ImageEncoder.prepare(
@@ -258,7 +258,7 @@ public enum OutputPreview {
             }
             return try ImageDecoder.decode(
                 url: document.url,
-                scale: settings.imageScale,
+                scale: settings.imageScale(for: document.info),
                 maxPixels: settings.maxPixels
             )
         }

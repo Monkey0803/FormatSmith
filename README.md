@@ -18,6 +18,9 @@ in the app itself.
   are found for you), or use *Open With → FormatSmith*.
 - **Seven output formats** by default — PNG, JPEG, HEIC, AVIF, TIFF, GIF, BMP — plus the long tail
   (JPEG 2000, Photoshop, Targa, OpenEXR, PBM, Windows Icon) behind one switch.
+- **Images can be opened with FormatSmith**: images, PDFs, HTML, Markdown and plain text are
+  declared as openable types (ranked *Alternate*, so the app appears in "Open With" without competing
+  to become your default viewer). Dropping a photo on the Dock icon now works.
 - **Resolution that means what it says**: PDFs render at a chosen DPI (72–600); images scale from
   their own pixels (1× = original). Enlarging an image is something you opt into, never a default.
 - **Backgrounds**: white, black, or transparent (transparency only where the format can store it).
@@ -303,6 +306,17 @@ Ten presets cover the common jobs: Web (PNG at 2×), Email (JPEG), Print (lossle
 Archive (PNG at original size), **Images to PDF** (one PDF, one page per image), **PDF to images**
 (PNG per page at 150 DPI), ID photo, Photo sheet, ID scan (front and back on one A4 page) and Scanned
 PDF.
+
+## Which settings apply
+
+A setting can be shown-but-do-nothing, or worse: active-but-hidden. Both have happened here — a
+background colour chosen for ID photos kept tinting PDFs after the ID photo controls were hidden, and
+the photo-sheet options were offered for PDF output that cannot use them. So the question "does this
+setting apply to the current inputs and target?" is answered in one place, `SettingsScope`, and the
+panel derives which sections to show from the same answer. `SettingsScopeTests` checks the matrix and,
+more importantly, the invariant behind it: **a setting declared inactive must not change the output
+when you change it**. A separate test fails if a rule exists but nothing in the panel consults it,
+which is how the longest-edge control was caught still appearing in ID photo mode.
 
 ## Why there is a pixel limit
 

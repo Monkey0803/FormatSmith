@@ -92,6 +92,12 @@ public struct ConversionSettings: Codable, Equatable, Sendable {
     public var resolutionMode: ResolutionMode = .dpi
     public var dpi: Double = 200
     public var scale: Double = 1
+    /// 图片最长边的上限（像素）；0 表示不限制。
+    ///
+    /// 「发给别人的图」通常不在乎原图多大，只在乎别超过某个尺寸。
+    /// 以前只能选倍数，而倍数对 48MP 和 12MP 的含义完全不同 —— 于是「邮件」预设
+    /// 号称能缩小附件，实际尺寸一个像素都没变。
+    public var maxLongEdge: Int = 0
 
     // 背景
     public var background: ImageBackground = .white
@@ -168,7 +174,7 @@ public struct ConversionSettings: Codable, Equatable, Sendable {
         }
     }
 
-    /// 图片输入使用的缩放系数。
+    /// 图片输入使用的缩放系数（不知道原图尺寸时用这个）。
     ///
     /// 只看 `scale`，**不再把 DPI 当成放大倍数**。
     /// 之前沿用了 PDF 的 72 DPI 约定，于是默认的 200 DPI 会把图片放大 2.78 倍 ——
@@ -176,6 +182,17 @@ public struct ConversionSettings: Codable, Equatable, Sendable {
     /// 图片本来就有自己的像素尺寸，放大只在用户明确要求时才做。
     public var imageScale: Double {
         max(0.05, scale)
+    }
+
+    /// 图片实际使用的缩放系数：先按倍数，再受最长边约束。
+    ///
+    /// 两者取小，所以最长边只会缩不会放：本来就不大的图不会被意外放大。
+    public func imageScale(for info: DocumentInfo) -> Double {
+        let requested = imageScale
+        guard maxLongEdge > 0 else { return requested }
+        let longest = max(info.displaySize.width, info.displaySize.height)
+        guard longest > 0 else { return requested }
+        return min(requested, Double(maxLongEdge) / Double(longest))
     }
 
     /// 按输出目标估算首张图的像素尺寸。
@@ -189,7 +206,7 @@ public struct ConversionSettings: Codable, Equatable, Sendable {
                 if printSheetEnabled { return printSheet.pixelSize(dpi: dpi) }
                 return idPhotoSize.pixelSize(dpi: dpi)
             }
-            return Self.scaled(info.displaySize, by: imageScale)
+            return Self.scaled(info.displaySize, by: imageScale(for: info))
         case .pdf:
             return Self.scaled(info.displaySize, by: effectiveScale)
         default:

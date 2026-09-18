@@ -34,6 +34,11 @@ public struct SourceDocument: Identifiable, Sendable, Equatable {
         self.displayName = displayName ?? url.deletingPathExtension().lastPathComponent
     }
 
+    /// 描述这个输入的信息，供设置判断用。
+    public var info: DocumentInfo {
+        DocumentInfo(kind: kind, pageCount: pageCount, displaySize: size)
+    }
+
     /// 套用探测结果，保留原有 id（队列里已经用它标识这一项）。
     public func with(info: DocumentInfo) -> SourceDocument {
         SourceDocument(
@@ -47,14 +52,22 @@ public struct SourceDocument: Identifiable, Sendable, Equatable {
         )
     }
 
-    /// 输入是从文件系统读来的，这里只取元信息，不做解码。
+    /// 从文件系统读入，只取元信息，不解码像素。
+    ///
+    /// **尺寸与页数一并探测。** 这两项决定了输出尺寸的估算与「最长边」这类约束，
+    /// 而引擎干活时只认 `SourceDocument` 里的值 —— 如果这里不填，
+    /// 调用方（比如命令行）就会拿到一份「尺寸为 0」的输入，
+    /// 于是所有与尺寸有关的设置静默失效。探测本身只读元数据，代价很低。
     public static func make(from url: URL) -> SourceDocument {
         let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
-        let size = (attributes?[.size] as? NSNumber)?.int64Value ?? 0
+        let byteSize = (attributes?[.size] as? NSNumber)?.int64Value ?? 0
+        let info = ConversionEngine.inspect(url)
         return SourceDocument(
             url: url,
-            kind: InputKind.detect(url: url),
-            byteSize: size
+            kind: info.kind,
+            pageCount: info.pageCount,
+            size: info.displaySize,
+            byteSize: byteSize
         )
     }
 }

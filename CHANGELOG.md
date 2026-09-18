@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.0] - 2026-09-15
 
+### Added
+
+- **Longest-edge limit for images** (Original / 1600 / 2048 / 4096 px, `--max-edge`). The Web and Email
+  presets claimed to produce smaller files but only changed format and quality — a 48 MP photo came out
+  at 48 MP. They now cap the longest edge, and the limit never enlarges a smaller image.
+- **`SettingsScope`**: one place that answers whether a setting applies to the current inputs and
+  target. The panel derives section visibility from it, and tests assert both the matrix and the
+  invariant that an inactive setting cannot change the output. A wiring test fails when a rule is not
+  consulted anywhere.
+- Images, HTML, Markdown and plain text are declared as openable types (rank *Alternate*), so images
+  can be opened with FormatSmith and dropped on its Dock icon.
+
+### Fixed
+
+- **Size-dependent settings silently did nothing for some callers.** `SourceDocument.make(from:)` never
+  populated the size or page count, so anything that scales by the source dimensions — the new
+  longest-edge limit, output estimates — was a no-op for any caller that had not inspected separately.
+  A document now knows its own size and page count.
+- **The metadata pass could overwrite a finished item.** The asynchronous inspection wrote `.ready`
+  unconditionally, so it could reset an item that had already been converted (or had failed) back to
+  "waiting". It now only touches the status while the item is still loading.
+
 ### Changed
 
 - **The execution dispatch now lives in one place.** Merge-into-one-PDF, whole-batch PDF tool, or

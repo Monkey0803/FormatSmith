@@ -60,6 +60,8 @@ public enum PresetLibrary {
             settings.dpi = 144
             // 图片看的是 scale，PDF 看的是 dpi —— 两条都要交代清楚
             settings.scale = 2
+            // 高分屏够用即可，别把 48MP 原图原样端上去
+            settings.maxLongEdge = 2048
             settings.background = .transparent
         },
 
@@ -73,6 +75,8 @@ public enum PresetLibrary {
             settings.resolutionMode = .dpi
             settings.dpi = 120
             settings.scale = 1
+            // 「小到能当附件」以前只换了格式，尺寸一个像素没动
+            settings.maxLongEdge = 1600
             settings.quality = 0.75
             settings.background = .white
         },
@@ -87,6 +91,7 @@ public enum PresetLibrary {
             settings.resolutionMode = .dpi
             settings.dpi = 300
             settings.scale = 1
+            settings.maxLongEdge = 0
             settings.background = .white
         },
 

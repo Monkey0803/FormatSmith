@@ -225,6 +225,19 @@ final class ConverterModel: ObservableObject {
         return estimate.width * estimate.height > settings.maxPixels
     }
 
+    /// 当前这批输入与目标下，哪些设置真的生效。
+    ///
+    /// 界面据此决定显示哪些分区：显示与生效来自同一处判断，
+    /// 不会出现「生效了却没地方看」或「显示了却不起作用」。
+    var settingsScope: SettingsScope {
+        SettingsScope(
+            documentKinds: convertibleItems.map(\.document.kind),
+            pageCounts: convertibleItems.map(\.document.pageCount),
+            target: settings.target,
+            settings: settings
+        )
+    }
+
     /// 这台文件的输出像素上限（百万像素），用于提示文案。
     var maxMegapixels: Int { settings.maxPixels / 1_000_000 }
 
@@ -427,7 +440,11 @@ final class ConverterModel: ObservableObject {
             guard let index = items.firstIndex(where: { $0.id == id }) else { continue }
             let url = items[index].url
             let kind = items[index].document.kind
-            items[index].status = .loading
+            // `SourceDocument.make` 已经把元信息探测好了，只有确实缺页数时才显示「载入中」，
+            // 免得刚加进来就先把状态闪一下。
+            if items[index].document.pageCount == 0 {
+                items[index].status = .loading
+            }
 
             Task { @MainActor in
                 let loaded = await Task.detached(priority: .utility) { () -> (DocumentInfo, NSImage?) in
@@ -448,10 +465,16 @@ final class ConverterModel: ObservableObject {
                 self.items[idx].document.pageCount = loaded.0.pageCount
                 self.items[idx].document.size = loaded.0.displaySize
                 self.items[idx].thumbnail = loaded.1
-                self.items[idx].status =
-                    loaded.0.pageCount > 0
-                    ? .ready
-                    : .failed(Localized.text("Could not read this file."))
+
+                // 元信息可能在转换开始之后、甚至结束之后才回来。
+                // 那时候不能再动状态，否则会把已经完成（或失败）的项打回「待转换」——
+                // 之前这里无条件写 `.ready`，就出过这个问题。
+                if case .loading = self.items[idx].status {
+                    self.items[idx].status =
+                        loaded.0.pageCount > 0
+                        ? .ready
+                        : .failed(Localized.text("Could not read this file."))
+                }
                 self.scheduleOutputPreview()
                 DebugLog.log(
                     "inspected \(url.lastPathComponent): \(loaded.0.kind.displayName), "

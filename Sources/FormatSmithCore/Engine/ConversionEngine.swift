@@ -539,7 +539,7 @@ public enum ConversionEngine {
             } else {
                 let decoded = try ImageDecoder.decode(
                     url: document.url,
-                    scale: settings.imageScale,
+                    scale: settings.imageScale(for: document.info),
                     maxPixels: settings.maxPixels
                 )
                 // 目标格式存不了透明通道时先铺底，避免透明区域变黑。
@@ -642,10 +642,10 @@ public enum ConversionEngine {
                         autoCrop: settings.idPhotoAutoCrop
                     ).image
                 } else {
-                    // 按用户选的倍数缩放（默认 1× = 原始像素），与输出估算保持一致
+                    // 按倍数缩放并受最长边约束（默认 1× = 原始像素），与输出估算一致
                     image = try ImageDecoder.decode(
                         url: document.url,
-                        scale: settings.imageScale,
+                        scale: settings.imageScale(for: document.info),
                         maxPixels: settings.maxPixels
                     )
                 }
