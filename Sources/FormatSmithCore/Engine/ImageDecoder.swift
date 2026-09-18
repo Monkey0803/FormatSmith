@@ -37,11 +37,11 @@ public enum ImageDecoder {
     /// - Parameter scale: 1.0 表示保持原始像素尺寸。
     public static func decode(url: URL, scale: Double, maxPixels: Int) throws -> CGImage {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else {
-            throw ConversionError.unsupportedInput(url.lastPathComponent)
+            throw ConversionError.unreadableFile()
         }
         let size = displaySize(of: url)
         guard size.width > 0, size.height > 0 else {
-            throw ConversionError.unsupportedInput(url.lastPathComponent)
+            throw ConversionError.unreadableFile()
         }
 
         return try decode(source: source, scale: scale, maxPixels: maxPixels, fallbackSize: size)

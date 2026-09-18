@@ -594,38 +594,28 @@ final class ConverterModel: ObservableObject {
 
         let snapshot = settings
         let flag = cancellation
-        let strategy = ConversionRouter.strategy(
-            inputs: queue.map(\.document.kind),
-            target: snapshot.target,
-            mergesImages: snapshot.mergeImagesIntoOnePDF
-        )
 
         // 把这一轮要用的数据固定下来，避免转换过程中队列变化影响遍历。
         let jobs = queue.map { ($0.id, $0.document) }
 
         Task { @MainActor in
-            if strategy == .imagesToOnePDF {
-                await self.runMerge(jobs: jobs, settings: snapshot, cancellation: flag, root: root)
-            } else if strategy == .pdfToolbox, snapshot.pdfTool.operatesOnWholeBatch, jobs.count > 1 {
-                await self.runPDFToolBatch(jobs: jobs, settings: snapshot, cancellation: flag, root: root)
-            } else {
-                await self.runIndividually(jobs: jobs, settings: snapshot, cancellation: flag, root: root)
-            }
+            await self.runConversion(jobs: jobs, settings: snapshot, cancellation: flag, root: root)
         }
     }
 
-    /// 每个文件各自产出（PDF → 图片、图片 → 图片、单图 → PDF）。
+    /// 跑完这一批。
     ///
-    /// 并发调度交给 `ConversionEngine.convertBatch`，这里只负责把进度写回界面。
-    private func runIndividually(
+    /// 合并成一个 PDF、整批走 PDF 工具箱、还是逐个转换，判断只在 `ConversionEngine.run`
+    /// 里做一次 —— 这里只负责把进度与结果写回界面。
+    private func runConversion(
         jobs: [(UUID, SourceDocument)],
         settings snapshot: ConversionSettings,
         cancellation flag: CancellationFlag,
         root: URL
     ) async {
-        let limit = ConversionEngine.automaticConcurrency(configured: snapshot.maxConcurrentFiles)
         inFlightProgress.removeAll()
 
+        let limit = ConversionEngine.automaticConcurrency(configured: snapshot.maxConcurrentFiles)
         status =
             limit > 1
             ? StatusMessage("Converting %d file(s), %d at a time…", jobs.count, limit)
@@ -638,7 +628,10 @@ final class ConverterModel: ObservableObject {
         // 进度回调来自工作线程，统一跳回主线程写状态。
         let observer = ConversionObserver(
             onProgress: { progress in
-                guard let documentID = progress.documentID else { return }
+                guard let documentID = progress.documentID else {
+                    Task { @MainActor in self.overallProgress = progress.fraction }
+                    return
+                }
                 Task { @MainActor in
                     self.recordProgress(
                         documentID: documentID,
@@ -655,31 +648,24 @@ final class ConverterModel: ObservableObject {
             }
         )
 
-        let results = await ConversionEngine.convertBatch(
-            documents: jobs.map(\.1),
-            target: snapshot.target,
-            settings: snapshot,
-            cancellation: flag,
-            maxConcurrency: limit,
-            observer: observer
-        )
+        let documents = jobs.map(\.1)
+        // 合并与工具箱是同步的 CPU 活，放到后台线程跑，别卡住界面
+        let results = await Task.detached(priority: .userInitiated) {
+            await ConversionEngine.run(
+                documents: documents,
+                target: snapshot.target,
+                settings: snapshot,
+                cancellation: flag,
+                observer: observer
+            )
+        }.value
 
         // 兜底：并发回调是异步投递的，等它们落地后再收尾。
         for result in results {
             recordFinished(result, fileCount: jobs.count)
         }
 
-        let failures = results.filter { $0.error != nil }.count
-        let lastFolder = results.compactMap(\.outputFolder).last ?? root
-
-        finish(
-            finished: results.count,
-            failures: failures,
-            cancelled: flag.isCancelled,
-            lastFolder: lastFolder,
-            settings: snapshot,
-            root: root
-        )
+        finish(results: results, cancelled: flag.isCancelled, root: root, settings: snapshot)
     }
 
     /// 更新单个文件内部的进度，并合成整体进度。
@@ -711,94 +697,6 @@ final class ConverterModel: ObservableObject {
     }
 
     /// 多张图片合并成一个 PDF：全部输入对应同一份输出。
-    private func runMerge(
-        jobs: [(UUID, SourceDocument)],
-        settings snapshot: ConversionSettings,
-        cancellation flag: CancellationFlag,
-        root: URL
-    ) async {
-        for (documentID, _) in jobs {
-            markConverting(itemID: documentID, done: 0, total: 1)
-        }
-        status = StatusMessage("Merging %d images into one PDF…", jobs.count)
-
-        let documents = jobs.map(\.1)
-        let observer = ConversionObserver(onProgress: { progress in
-            Task { @MainActor in
-                self.overallProgress = progress.fraction
-            }
-        })
-
-        let result = await Task.detached(priority: .userInitiated) {
-            ConversionEngine.composePDF(
-                documents: documents,
-                settings: snapshot,
-                cancellation: flag,
-                observer: observer
-            )
-        }.value
-
-        for documentID in result.includedDocumentIDs {
-            apply(result, to: documentID)
-        }
-
-        finish(
-            finished: 1,
-            failures: result.error == nil ? 0 : 1,
-            cancelled: flag.isCancelled,
-            lastFolder: result.outputFolder ?? root,
-            settings: snapshot,
-            root: root,
-            mergedCount: jobs.count
-        )
-    }
-
-    /// 需要整批处理的 PDF 工具（合并）：所有输入对应同一份输出。
-    private func runPDFToolBatch(
-        jobs: [(UUID, SourceDocument)],
-        settings snapshot: ConversionSettings,
-        cancellation flag: CancellationFlag,
-        root: URL
-    ) async {
-        for (documentID, _) in jobs {
-            markConverting(itemID: documentID, done: 0, total: 1)
-        }
-        status = StatusMessage("Merging %d PDFs into one…", jobs.count)
-
-        let documents = jobs.map(\.1)
-        let observer = ConversionObserver(onProgress: { progress in
-            Task { @MainActor in
-                self.overallProgress = progress.fraction
-            }
-        })
-
-        let result = await Task.detached(priority: .userInitiated) {
-            ConversionEngine.runPDFTool(
-                documents: documents,
-                tool: snapshot.pdfTool,
-                settings: snapshot,
-                cancellation: flag,
-                observer: observer
-            )
-        }.value
-
-        for documentID in result.includedDocumentIDs {
-            apply(result, to: documentID)
-        }
-
-        finish(
-            finished: 1,
-            failures: result.error == nil ? 0 : 1,
-            cancelled: flag.isCancelled,
-            lastFolder: result.outputFolder ?? root,
-            settings: snapshot,
-            root: root,
-            successSummary: result.error == nil
-                ? Localized.text("Merged %d PDFs → %@", jobs.count, result.outputFiles.first?.lastPathComponent ?? "")
-                : nil
-        )
-    }
-
     // MARK: - 状态更新
 
     private func markConverting(itemID: UUID, done: Int, total: Int) {
@@ -819,33 +717,34 @@ final class ConverterModel: ObservableObject {
         }
     }
 
+    /// 收尾：状态行、汇总卡片、以及可选的自动打开输出目录。
+    ///
+    /// 一切都从结果推导：失败数、合并了几份、输出目录。
     private func finish(
-        finished: Int,
-        failures: Int,
+        results: [ConversionResult],
         cancelled: Bool,
-        lastFolder: URL,
-        settings snapshot: ConversionSettings,
         root: URL,
-        mergedCount: Int = 0,
-        successSummary: String? = nil
+        settings snapshot: ConversionSettings
     ) {
         isConverting = false
         overallProgress = cancelled ? 0 : 1
+
+        let failures = results.filter { $0.error != nil }.count
+        let mergedCount = results.first { $0.includedDocumentIDs.count > 1 }?.includedDocumentIDs.count ?? 0
+        let lastFolder = results.compactMap(\.outputFolder).first ?? root
         lastOutputFolder = lastFolder
+
         batchSummary = Self.summarise(items: items, folder: lastFolder, cancelled: cancelled)
 
         if cancelled {
             status = StatusMessage("Cancelled.")
         } else if failures > 0 {
             status = StatusMessage("Finished with %d failure(s).", failures)
-        } else if let successSummary {
-            status = StatusMessage("%@", successSummary)
-            if snapshot.openFolderWhenFinished { openOutputFolder() }
         } else if mergedCount > 0 {
-            status = StatusMessage("Merged %d images → %@", mergedCount, lastFolder.path)
+            status = StatusMessage("Merged %d file(s) → %@", mergedCount, lastFolder.path)
             if snapshot.openFolderWhenFinished { openOutputFolder() }
         } else {
-            status = StatusMessage("Finished: %d file(s) → %@", finished, root.path)
+            status = StatusMessage("Finished: %d file(s) → %@", results.count, lastFolder.path)
             if snapshot.openFolderWhenFinished { openOutputFolder() }
         }
     }

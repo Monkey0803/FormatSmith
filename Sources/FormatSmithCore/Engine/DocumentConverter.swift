@@ -64,7 +64,7 @@ public enum DocumentConverter {
             return try renderHTML(html, title: url.deletingPathExtension().lastPathComponent, to: outputURL)
 
         default:
-            throw ConversionError.unsupportedInput(kind.displayName)
+            throw ConversionError.unreadableFormat(kind.displayName)
         }
     }
 
@@ -155,7 +155,7 @@ public enum DocumentConverter {
         if let text = try? NSString(contentsOf: url, usedEncoding: &encoding) {
             return text as String
         }
-        throw ConversionError.unsupportedInput(url.lastPathComponent)
+        throw ConversionError.unreadableFile()
     }
 
     static func sanitize(_ name: String) -> String {

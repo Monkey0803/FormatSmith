@@ -306,59 +306,62 @@ enum CommandLineTool {
             )
         }
 
-        let strategy = ConversionRouter.strategy(
-            inputs: documents.map(\.kind),
-            target: settings.target,
-            mergesImages: settings.mergeImagesIntoOnePDF
-        )
-
-        if strategy == .imagesToOnePDF {
-            failures += mergeIntoOnePDF(documents: documents, settings: settings, cancellation: cancellation)
-        } else if strategy == .pdfToolbox, settings.pdfTool.operatesOnWholeBatch, documents.count > 1 {
-            failures += runPDFToolOnBatch(documents: documents, settings: settings, cancellation: cancellation)
-        } else {
-            failures += convertIndividually(documents: documents, settings: settings, cancellation: cancellation)
-        }
-
-        return failures == 0 ? 0 : 1
-    }
-
-    // MARK: - 执行
-
-    private static func convertIndividually(
-        documents: [SourceDocument],
-        settings: ConversionSettings,
-        cancellation: CancellationFlag
-    ) -> Int {
-        // 走和界面同一套并发实现：这样冒烟测试才能真正覆盖到批量转换路径，
-        // 顺带让「一次转几十个文件」在命令行里也快起来。
-        let limit = ConversionEngine.automaticConcurrency(configured: settings.maxConcurrentFiles)
+        // 分派只有一个地方 —— ConversionEngine.run。
+        // 合并成一个 PDF、整批走 PDF 工具箱、还是逐个转换，界面与命令行不再各判断一次。
         let printer = ProgressPrinter(fileName: "\(documents.count) file(s)")
-
         let results: [ConversionResult]
         do {
             results = try MainThreadBridge.await {
-                await ConversionEngine.convertBatch(
+                await ConversionEngine.run(
                     documents: documents,
                     target: settings.target,
                     settings: settings,
                     cancellation: cancellation,
-                    maxConcurrency: limit,
                     observer: ConversionObserver(onProgress: { printer.report($0) })
                 )
             }
         } catch {
             FileHandle.standardError.write("✗ \(error.localizedDescription)\n".data(using: .utf8)!)
-            return documents.count
+            return Int32(documents.count)
         }
 
+        return Int32(report(results, documents: documents, settings: settings))
+    }
+
+    // MARK: - 报告
+
+    /// 把结果打到标准输出，返回失败数。
+    ///
+    /// 一条结果可能对应多个输入（合并输出），所以按 `includedDocumentIDs` 判断：
+    /// 多于一个就按「合并」报告，否则按单个文件报告。
+    private static func report(
+        _ results: [ConversionResult],
+        documents: [SourceDocument],
+        settings: ConversionSettings
+    ) -> Int {
+        let names = Dictionary(
+            documents.map { ($0.id, $0.url.lastPathComponent) },
+            uniquingKeysWith: { first, _ in first }
+        )
         var failures = 0
+
         for result in results {
-            let document = documents.first { $0.id == result.documentID }
-            let name = document?.url.lastPathComponent ?? result.documentID.uuidString
+            let involved = result.includedDocumentIDs
+            let name = names[result.documentID] ?? result.documentID.uuidString
+
             if let error = result.error {
-                FileHandle.standardError.write("✗ \(name): \(error.message)\n".data(using: .utf8)!)
+                let label = involved.count > 1 ? "\(involved.count) file(s)" : name
+                FileHandle.standardError.write("✗ \(label): \(error.message)\n".data(using: .utf8)!)
                 failures += 1
+                continue
+            }
+
+            if involved.count > 1 {
+                if result.outputFiles.count == 1, let output = result.outputFiles.first {
+                    print("✓ merged \(involved.count) file(s) → \(output.path)")
+                } else {
+                    for url in result.outputFiles { print("✓ → \(url.path)") }
+                }
             } else if result.outputFiles.count == 1, let output = result.outputFiles.first {
                 // 单文件输出（提取、旋转、压缩、文档转 PDF）报文件本身
                 print("✓ \(name) → \(output.path)")
@@ -367,59 +370,8 @@ enum CommandLineTool {
                 print("✓ \(name) → \(result.producedCount) file(s)  \(folder)")
             }
         }
+
         return failures
-    }
-
-    private static func mergeIntoOnePDF(
-        documents: [SourceDocument],
-        settings: ConversionSettings,
-        cancellation: CancellationFlag
-    ) -> Int {
-        let printer = ProgressPrinter(fileName: "\(documents.count) images")
-        let observer = ConversionObserver(onProgress: { printer.report($0) })
-
-        let result = ConversionEngine.composePDF(
-            documents: documents,
-            settings: settings,
-            cancellation: cancellation,
-            observer: observer
-        )
-
-        if let error = result.error {
-            FileHandle.standardError.write("✗ merge failed: \(error.message)\n".data(using: .utf8)!)
-            return 1
-        }
-        if let output = result.outputFiles.first {
-            print("✓ merged \(documents.count) image(s) → \(output.path)")
-        }
-        return 0
-    }
-
-    private static func runPDFToolOnBatch(
-        documents: [SourceDocument],
-        settings: ConversionSettings,
-        cancellation: CancellationFlag
-    ) -> Int {
-        let printer = ProgressPrinter(fileName: "\(documents.count) PDFs")
-        let observer = ConversionObserver(onProgress: { printer.report($0) })
-
-        let result = ConversionEngine.runPDFTool(
-            documents: documents,
-            tool: settings.pdfTool,
-            settings: settings,
-            cancellation: cancellation,
-            observer: observer
-        )
-
-        if let error = result.error {
-            FileHandle.standardError.write(
-                "✗ \(settings.pdfTool.rawValue) failed: \(error.message)\n".data(using: .utf8)!)
-            return 1
-        }
-        for url in result.outputFiles {
-            print("✓ \(settings.pdfTool.rawValue) → \(url.path)")
-        }
-        return 0
     }
 
     // MARK: - 输出

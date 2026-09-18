@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.0] - 2026-09-15
 
+### Changed
+
+- **The execution dispatch now lives in one place.** Merge-into-one-PDF, whole-batch PDF tool, or
+  per-file — `ConversionEngine.run` decides once and both the app and the CLI call it. Previously each
+  kept its own copy of that branch (about forty duplicated lines), which is precisely how two entry
+  points drift apart. `run` also guarantees the observer is notified for every result, including the
+  merged and whole-batch paths, which previously reported nothing.
+
+### Fixed
+
+- "Cannot read bad.jpg files." — the file-level and format-level errors shared one message template, so
+  a file name was substituted into a sentence written for format names. Split into
+  `unreadableFile()` ("Cannot read this file.", the file name is already shown next to it) and
+  `unreadableFormat(_:)` ("This Mac cannot read %@ files.").
+
 ### Added
 
 - **Preview for every pipeline**, not just ID photos: composed PDF pages, page 1 of a PDF at the

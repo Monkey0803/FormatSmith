@@ -33,7 +33,7 @@ public enum HTMLtoPDFConverter {
         timeout: TimeInterval = 120
     ) throws -> URL {
         guard FileManager.default.fileExists(atPath: htmlURL.path) else {
-            throw ConversionError.unsupportedInput(htmlURL.lastPathComponent)
+            throw ConversionError.unreadableFile()
         }
 
         let data = try MainThreadBridge.run(timeout: timeout) { @MainActor in

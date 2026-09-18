@@ -34,8 +34,18 @@ public struct ConversionError: LocalizedError, Equatable {
         ConversionError(Localized.text("This Mac cannot write %@ files.", name))
     }
 
-    public static func unsupportedInput(_ name: String) -> ConversionError {
-        ConversionError(Localized.text("Cannot read %@ files.", name))
+    /// 某个具体文件读不了。
+    ///
+    /// 与下面的「格式不支持」分开：同一个句式套文件名会变成
+    /// 「Cannot read bad.jpg files.」这种语法不通的话。
+    /// 消息里不再重复文件名 —— 界面与命令行都会在它旁边显示文件名。
+    public static func unreadableFile() -> ConversionError {
+        ConversionError(Localized.text("Cannot read this file."))
+    }
+
+    /// 这种格式这台机器读不了。
+    public static func unreadableFormat(_ name: String) -> ConversionError {
+        ConversionError(Localized.text("This Mac cannot read %@ files.", name))
     }
 
     public static func conversionNotSupported(_ from: String, _ to: String) -> ConversionError {

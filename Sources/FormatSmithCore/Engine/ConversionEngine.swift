@@ -199,6 +199,69 @@ public enum ConversionEngine {
         }
     }
 
+    /// 按输入和目标自动选择执行方式，并跑完这一批。
+    ///
+    /// **这是唯一的分派入口。** 合并成一个 PDF、整批走 PDF 工具箱、还是逐个转换，
+    /// 这个判断以前在界面和命令行里各写了一遍；两处一旦分叉，
+    /// 同一组文件在两个入口就会得到不同结果。现在只在这里判断一次。
+    ///
+    /// - Returns: 每个「产出」对应一条结果。合并类输出只有一条，
+    ///   其 `includedDocumentIDs` 记录了参与的全部输入。
+    public static func run(
+        documents: [SourceDocument],
+        target: OutputTarget,
+        settings: ConversionSettings,
+        cancellation: CancellationFlag,
+        observer: ConversionObserver = .none
+    ) async -> [ConversionResult] {
+        guard !documents.isEmpty else { return [] }
+
+        let strategy = ConversionRouter.strategy(
+            inputs: documents.map(\.kind),
+            target: target,
+            mergesImages: settings.mergeImagesIntoOnePDF
+        )
+
+        // 说明：逐个转换那条路里，`convertBatch` 已经逐条通知过观察者；
+        // 下面两条是「一次产出」的路径，也要通知，否则只看观察者的调用方会漏掉结果。
+
+        // 多张图片合成一个 PDF
+        if strategy == .imagesToOnePDF {
+            let result = composePDF(
+                documents: documents,
+                settings: settings,
+                cancellation: cancellation,
+                observer: observer,
+                fileCount: 1
+            )
+            observer.onFileFinished?(result)
+            return [result]
+        }
+
+        // 整个批次当一个整体做的 PDF 工具箱（合并/压缩这类）
+        if strategy == .pdfToolbox, settings.pdfTool.operatesOnWholeBatch, documents.count > 1 {
+            let result = runPDFTool(
+                documents: documents,
+                tool: settings.pdfTool,
+                settings: settings,
+                cancellation: cancellation,
+                observer: observer,
+                fileCount: 1
+            )
+            observer.onFileFinished?(result)
+            return [result]
+        }
+
+        return await convertBatch(
+            documents: documents,
+            target: target,
+            settings: settings,
+            cancellation: cancellation,
+            maxConcurrency: automaticConcurrency(configured: settings.maxConcurrentFiles),
+            observer: observer
+        )
+    }
+
     /// 自动并发度：按核数，但不超过 4 —— 再多收益很小，内存却按倍数上涨。
     public static func automaticConcurrency(configured: Int) -> Int {
         let cores = ProcessInfo.processInfo.activeProcessorCount

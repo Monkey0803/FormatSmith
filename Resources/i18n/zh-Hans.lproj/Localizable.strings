@@ -49,8 +49,8 @@
 "Cancel" = "取消";
 "Cancelled" = "已取消";
 "Cancelled." = "已取消。";
-"Cannot read %@ files." = "无法读取 %@ 文件。";
 "Cannot read this PDF (the file may be damaged or password protected)." = "无法解析该 PDF（文件可能已损坏或受密码保护）。";
+"Cannot read this file." = "无法读取这个文件。";
 "Change…" = "更改…";
 "Choose Files…" = "选择文件…";
 "Choose files" = "选择文件";
@@ -129,7 +129,6 @@
 "Match image" = "跟随图片";
 "Merge" = "合并";
 "Merge all images into one PDF" = "把所有图片合并成一个 PDF";
-"Merged %d PDFs → %@" = "已合并 %d 个 PDF → %@";
 "Missing tools" = "缺少依赖";
 "Move down" = "下移";
 "Move up" = "上移";
@@ -205,6 +204,7 @@
 "The page range is empty or invalid." = "页码范围为空或不合法。";
 "The subject is cut out with on-device person segmentation." = "人像用系统本地的人像分割自动抠出，照片不会离开这台机器。";
 "There is nothing to convert." = "没有可转换的文件。";
+"This Mac cannot read %@ files." = "这台 Mac 无法读取 %@ 文件。";
 "This Mac cannot write %@ files." = "本机无法写出 %@ 文件。";
 "This PDF has no pages." = "这个 PDF 没有页面。";
 "This PDF is encrypted and needs a password." = "该 PDF 已加密，需要密码。";
