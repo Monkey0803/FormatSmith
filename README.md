@@ -342,7 +342,9 @@ report pixels × scale, PDFs report points × DPI.
   than bundle a third-party encoder, the app leaves them out of the output list and says why.
 - **ID photo cutouts are as good as Vision's segmentation.** Hair edges and busy backgrounds can be
   imperfect; enable "Keep original" to crop and resize without touching the background.
-- **Office documents need LibreOffice**, which is not installed for you. (Not wired up yet.)
+- **Office documents need LibreOffice**. It is detected, not bundled — `--check-dependencies` reports
+  whether it is there. Without it, Word/Excel/PowerPoint/ODF/RTF inputs are refused with that reason;
+  HTML, Markdown and plain text still convert because they go through WebKit.
 - Builds are ad-hoc signed, not notarized, so the first launch needs a right-click → Open.
 
 ## License
