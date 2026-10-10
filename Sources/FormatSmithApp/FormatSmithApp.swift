@@ -28,8 +28,6 @@ struct FormatSmithApp: App {
                 .onAppear { appDelegate.model = model }
                 // 语言变化时让视图重新取词（不重建视图树，滚动位置与输入焦点都会保留）。
                 .localizedText(model.language)
-                // 外观只作用于界面，不影响任何转换结果
-                .preferredColorScheme(model.appearance.colorScheme)
                 .sheet(isPresented: $model.showsShortcuts) { ShortcutsView() }
         }
         .defaultSize(width: 1040, height: 680)

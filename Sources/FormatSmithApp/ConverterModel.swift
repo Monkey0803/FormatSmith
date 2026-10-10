@@ -133,6 +133,12 @@ final class ConverterModel: ObservableObject {
     @Published var appearance: AppAppearance {
         didSet {
             UserDefaults.standard.set(appearance.rawValue, forKey: Self.appearanceKey)
+            AppearanceController.apply(appearance)
+            DebugLog.log(
+                "appearance: \(appearance.rawValue) "
+                    + "(pinned: \(!AppearanceController.isFollowingSystem), "
+                    + "effective: \(AppearanceController.effectiveName))"
+            )
         }
     }
 
@@ -146,7 +152,16 @@ final class ConverterModel: ObservableObject {
     init() {
         // 语言要在任何界面构建之前确定下来。
         let storedAppearance = UserDefaults.standard.string(forKey: Self.appearanceKey)
-        appearance = storedAppearance.flatMap(AppAppearance.init(rawValue:)) ?? .system
+        let resolvedAppearance = storedAppearance.flatMap(AppAppearance.init(rawValue:)) ?? .system
+        appearance = resolvedAppearance
+        // 恢复上次的选择。`.system` 对应把 appearance 置空，因此会老实跟随系统。
+        // 传局部变量而不是 self.appearance：init 还没走完，读属性会报「未初始化」。
+        AppearanceController.apply(resolvedAppearance)
+        DebugLog.log(
+            "appearance: \(resolvedAppearance.rawValue) "
+                + "(pinned: \(!AppearanceController.isFollowingSystem), "
+                + "effective: \(AppearanceController.effectiveName))"
+        )
 
         let stored = UserDefaults.standard.string(forKey: Self.languageKey)
         let resolved = stored.flatMap(AppLanguage.init(rawValue:)) ?? .system
