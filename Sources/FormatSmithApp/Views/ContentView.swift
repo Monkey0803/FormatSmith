@@ -44,6 +44,36 @@ struct BottomBarView: View {
                     .progressViewStyle(.linear)
                     .frame(height: 4)
             }
+            // 误点 × 之后还有退路。只保留最近一次，撤销不该是一件需要想的事。
+            if let removed = model.recentlyRemoved, !model.isConverting {
+                HStack(spacing: 10) {
+                    Image(systemName: "arrow.uturn.backward.circle")
+                        .foregroundStyle(.secondary)
+                    Text(Localized.text("Removed %d file(s)", removed.entries.count))
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                    Button(Localized.text("Undo")) { model.undoRemove() }
+                        .font(.system(size: 12))
+                        .keyboardShortcut("z", modifiers: .command)
+                    Spacer(minLength: 4)
+                    Button {
+                        model.dismissUndoOffer()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(.tertiary)
+                            .padding(4)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help(Localized.text("Dismiss"))
+                    .accessibilityLabel(Localized.text("Dismiss"))
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Color.accentColor.opacity(0.08))
+                Divider()
+            }
             HStack(spacing: 12) {
                 Image(systemName: statusIcon)
                     .foregroundStyle(statusColor)

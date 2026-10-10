@@ -162,6 +162,8 @@ struct QueueRowView: View {
     @EnvironmentObject private var model: ConverterModel
     let item: QueueItem
 
+    private var isSelected: Bool { model.selection.contains(item.id) }
+
     var body: some View {
         HStack(spacing: 12) {
             thumbnail
@@ -222,6 +224,7 @@ struct QueueRowView: View {
                 .buttonStyle(.plain)
                 .disabled(!model.canMoveUp(id: item.id))
                 .help(Localized.text("Move up"))
+                .accessibilityLabel(Localized.text("Move %@ up", item.document.displayName))
 
                 Button {
                     model.moveDown(id: item.id)
@@ -237,7 +240,58 @@ struct QueueRowView: View {
                 .buttonStyle(.plain)
                 .disabled(!model.canMoveDown(id: item.id))
                 .help(Localized.text("Move down"))
+                .accessibilityLabel(Localized.text("Move %@ down", item.document.displayName))
             }
+        }
+    }
+
+    /// 右键菜单。
+    ///
+    /// macOS 上右键列表项是本能动作；把常用的几个放在这里，
+    /// 用户就不必去行尾找那个很小的按钮。
+    @ViewBuilder
+    private var contextMenu: some View {
+        // 右键未选中的项时，先把它选上，避免「菜单操作的是别的东西」
+        let targets = isSelected ? model.selectedItems : [item]
+
+        Button(Localized.text("Show in Finder")) {
+            model.reveal(item.url.deletingLastPathComponent())
+        }
+
+        Button(Localized.text("Copy File Name")) {
+            if isSelected {
+                model.copySelectedNames()
+            } else {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(item.document.displayName, forType: .string)
+            }
+        }
+
+        Divider()
+
+        if targets.count > 1 {
+            Button(Localized.text("Remove %d files", targets.count)) {
+                model.removeSelected()
+            }
+        } else {
+            Button(Localized.text("Remove")) {
+                model.remove(id: item.id)
+            }
+        }
+
+        if case .finished = item.status {
+            Button(Localized.text("Show Output in Finder")) {
+                if case let .finished(_, folder, _) = item.status, let folder {
+                    model.reveal(folder)
+                }
+            }
+        }
+
+        Divider()
+
+        Button(Localized.text("Select All")) { model.selectAll() }
+        if !model.selection.isEmpty {
+            Button(Localized.text("Deselect All")) { model.selection.removeAll() }
         }
     }
 

@@ -12,6 +12,12 @@ struct FormatSmithApp: App {
         CommandLineTool.runIfNeeded()
     }
 
+    /// 前九个预设对应 ⌘1…⌘9，第十个对应 ⌘0（十个预设刚好用满一行数字键）。
+    private static func shortcutKey(for index: Int) -> KeyEquivalent {
+        guard let digit = "1234567890".dropFirst(index).first else { return "0" }
+        return KeyEquivalent(digit)
+    }
+
     var body: some Scene {
         // 单窗口工具：用 Window 而不是 WindowGroup，
         // 否则「用 FormatSmith 打开」多个文件时每个文件都会弹一个新窗口。
@@ -22,6 +28,7 @@ struct FormatSmithApp: App {
                 .onAppear { appDelegate.model = model }
                 // 语言变化时让视图重新取词（不重建视图树，滚动位置与输入焦点都会保留）。
                 .localizedText(model.language)
+                .sheet(isPresented: $model.showsShortcuts) { ShortcutsView() }
         }
         .defaultSize(width: 1040, height: 680)
         .windowResizability(.contentMinSize)
@@ -39,6 +46,38 @@ struct FormatSmithApp: App {
                     .keyboardShortcut("k", modifiers: [.command, .shift])
                     .disabled(model.items.isEmpty || model.isConverting)
             }
+            CommandGroup(after: .pasteboard) {
+                Divider()
+                Button(Localized.text("Select All")) { model.selectAll() }
+                    .keyboardShortcut("a", modifiers: .command)
+                    .disabled(model.items.isEmpty)
+                Button(Localized.text("Deselect All")) { model.selection.removeAll() }
+                    .disabled(model.selection.isEmpty)
+                Button(Localized.text("Remove Selected")) { model.removeSelected() }
+                    .keyboardShortcut(.delete, modifiers: [])
+                    .disabled(model.selection.isEmpty || model.isConverting)
+                Button(Localized.text("Copy File Names")) { model.copySelectedNames() }
+                    .keyboardShortcut("c", modifiers: [.command, .shift])
+                    .disabled(model.selection.isEmpty)
+            }
+
+            CommandGroup(replacing: .help) {
+                Button(Localized.text("Keyboard Shortcuts")) { model.showsShortcuts = true }
+                Link(
+                    Localized.text("Usage guide"),
+                    destination: URL(string: "https://github.com/Monkey0803/FormatSmith#readme")!
+                )
+            }
+
+            // ⌘1…⌘9、⌘0 套用十个预设
+            CommandMenu(Localized.text("Presets")) {
+                ForEach(Array(PresetLibrary.all.enumerated()), id: \.element.id) { index, preset in
+                    Button(preset.name) { model.apply(preset) }
+                        .keyboardShortcut(Self.shortcutKey(for: index), modifiers: .command)
+                        .disabled(model.items.isEmpty || model.isConverting)
+                }
+            }
+
             CommandMenu(Localized.text("Language")) {
                 // 读一次 language：切换后菜单标题也跟着更新
                 let active = model.language

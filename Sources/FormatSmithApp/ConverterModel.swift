@@ -97,6 +97,25 @@ final class ConverterModel: ObservableObject {
     @Published var batchSummary: BatchSummary?
     /// 是否展示「关于」面板。
     @Published var showsAbout = false
+    /// 是否展示快捷键一览。
+    @Published var showsShortcuts = false
+
+    /// 队列里被选中的项。右键菜单与批量删除都基于它。
+    @Published var selection = Set<UUID>()
+
+    /// 刚被移除的项，用来支持撤销。
+    ///
+    /// 只记最近一次：够用，而且不会让「撤销」变成一件需要想的事。
+    @Published private(set) var recentlyRemoved: RemovedBatch?
+
+    struct RemovedBatch: Equatable {
+        /// 原位置，用于放回原处
+        let entries: [(index: Int, item: QueueItem)]
+
+        static func == (lhs: RemovedBatch, rhs: RemovedBatch) -> Bool {
+            lhs.entries.map(\.item.id) == rhs.entries.map(\.item.id)
+        }
+    }
     /// 是否展开长尾格式。
     @Published var showsAllFormats = false
     /// 界面语言。改动会立刻生效（根视图用它的值做 id，从而重建整棵视图树）。
@@ -285,6 +304,8 @@ final class ConverterModel: ObservableObject {
     // MARK: - 证件照预览
 
     private var previewTask: Task<Void, Never>?
+    /// 本轮转换的开始时间，用来判断是否值得发系统通知。
+    private var runStartedAt: Date?
     /// 预览复用同一个会话，证件照的人像分析只跑一次。
     private let previewSession = OutputPreviewSession()
 
@@ -517,16 +538,94 @@ final class ConverterModel: ObservableObject {
     }
 
     func remove(id: UUID) {
-        items.removeAll { $0.id == id }
+        remove(ids: [id])
+    }
+
+    /// 一次移除多个，并记下原位置以便撤销。
+    func remove(ids: Set<UUID>) {
+        guard !isConverting, !ids.isEmpty else { return }
+
+        let doomed = items.enumerated()
+            .filter { ids.contains($0.element.id) }
+            .map { (index: $0.offset, item: $0.element) }
+        guard !doomed.isEmpty else { return }
+
+        let doomedIDs = Set(doomed.map(\.item.id))
+        items.removeAll { doomedIDs.contains($0.id) }
+        selection.subtract(doomedIDs)
+        recentlyRemoved = RemovedBatch(entries: doomed)
+
         scheduleOutputPreview()
-        if items.isEmpty {
-            status = .idle
+        if items.isEmpty { status = .idle }
+    }
+
+    /// 移除当前选中的项。
+    func removeSelected() {
+        remove(ids: selection)
+    }
+
+    /// 把上一次移除的项放回原位。
+    func undoRemove() {
+        guard !isConverting, let batch = recentlyRemoved else { return }
+        for entry in batch.entries.sorted(by: { $0.index < $1.index }) {
+            let position = min(max(entry.index, 0), items.count)
+            items.insert(entry.item, at: position)
         }
+        recentlyRemoved = nil
+        scheduleOutputPreview()
+        status = StatusMessage("Restored %d file(s).", batch.entries.count)
+    }
+
+    /// 撤销机会是否还在。
+    var canUndoRemove: Bool { recentlyRemoved != nil }
+
+    func dismissUndoOffer() {
+        recentlyRemoved = nil
+    }
+
+    // MARK: 选中
+
+    func select(id: UUID, extending: Bool, toggling: Bool) {
+        if extending, let anchor = lastSelectedID, let from = items.firstIndex(where: { $0.id == anchor }),
+            let to = items.firstIndex(where: { $0.id == id })
+        {
+            let range = from <= to ? from...to : to...from
+            selection.formUnion(items[range].map(\.id))
+            return
+        }
+        if toggling {
+            if selection.contains(id) { selection.remove(id) } else { selection.insert(id) }
+        } else {
+            selection = [id]
+        }
+        lastSelectedID = id
+    }
+
+    var lastSelectedID: UUID?
+
+    func selectAll() {
+        selection = Set(items.map(\.id))
+    }
+
+    /// 当前选中的项（保持队列顺序）。
+    var selectedItems: [QueueItem] {
+        items.filter { selection.contains($0.id) }
+    }
+
+    /// 复制选中项的文件名，一行一个。
+    func copySelectedNames() {
+        let names = selectedItems.map(\.document.displayName)
+        guard !names.isEmpty else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(names.joined(separator: "\n"), forType: .string)
+        status = StatusMessage("Copied %d name(s).", names.count)
     }
 
     func removeAll() {
         guard !isConverting else { return }
+        recentlyRemoved = RemovedBatch(entries: items.enumerated().map { (index: $0.offset, item: $0.element) })
         items.removeAll()
+        selection.removeAll()
         scheduleOutputPreview()
         overallProgress = 0
         status = .idle
@@ -534,7 +633,12 @@ final class ConverterModel: ObservableObject {
 
     func clearFinished() {
         guard !isConverting else { return }
-        items.removeAll { $0.status.isTerminal }
+        let doomed = items.enumerated().filter { $0.element.status.isTerminal }
+        guard !doomed.isEmpty else { return }
+        let ids = Set(doomed.map(\.element.id))
+        items.removeAll { ids.contains($0.id) }
+        selection.subtract(ids)
+        recentlyRemoved = RemovedBatch(entries: doomed.map { (index: $0.offset, item: $0.element) })
     }
 
     // MARK: - 面板
@@ -608,6 +712,7 @@ final class ConverterModel: ObservableObject {
 
         cancellation.reset()
         isConverting = true
+        runStartedAt = Date()
         overallProgress = 0
         lastOutputFolder = nil
         batchSummary = nil
@@ -760,6 +865,16 @@ final class ConverterModel: ObservableObject {
         lastOutputFolder = lastFolder
 
         batchSummary = Self.summarise(items: items, folder: lastFolder, cancelled: cancelled)
+
+        if let start = runStartedAt {
+            let summary = batchSummary
+            Notifier.notifyIfNeeded(
+                duration: Date().timeIntervalSince(start),
+                succeeded: summary?.succeeded ?? 0,
+                failed: summary?.failures.count ?? 0
+            )
+        }
+        runStartedAt = nil
 
         if cancelled {
             status = StatusMessage("Cancelled.")

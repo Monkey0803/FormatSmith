@@ -10,6 +10,7 @@
 "%@ was not found, so this format cannot be converted. %@" = "未找到 %@，无法转换该格式。%@";
 "%@ · %d × %d px" = "%@ · %d × %d 像素";
 "%@ · ready" = "%@ · 就绪";
+"%d done, %d failed" = "完成 %d 个，失败 %d 个";
 "%d failed" = "失败 %d 个";
 "%d file(s)" = "共 %d 个文件";
 "%d file(s) written" = "共写出 %d 个文件";
@@ -73,12 +74,15 @@
 "Compress embedded images (JPEG)" = "压缩内嵌图片（JPEG）";
 "Compressing turns each page into an image: text is no longer selectable." = "压缩会把每页转成图片，文本将无法再选中。";
 "Conversion failed" = "转换失败";
+"Conversion finished" = "转换完成";
 "Convert" = "转换";
 "Convert Now" = "开始转换";
 "Convert documents to PDF first, then to images." = "文档需要先转成 PDF，再转成图片。";
 "Converting %@ to %@ is not supported." = "不支持把 %@ 转换为 %@。";
 "Converting %d of %d" = "转换中 %d/%d";
 "Copy" = "复制";
+"Copy File Name" = "复制文件名";
+"Copy File Names" = "复制文件名";
 "Could not create a drawing context." = "无法创建绘图上下文。";
 "Could not create the PDF context." = "无法创建 PDF 上下文。";
 "Could not decode this image." = "无法解码该图片。";
@@ -91,6 +95,7 @@
 "Custom" = "自定义";
 "Cut guides" = "裁切辅助线";
 "Delete pages" = "删除页面";
+"Deselect All" = "取消全选";
 "Dismiss" = "关闭";
 "Documents" = "文档";
 "Done" = "完成";
@@ -133,6 +138,8 @@
 "Keep only the pages you list." = "只保留你列出的页面。";
 "Keep original" = "保留原背景";
 "Keeps camera and time, drops GPS coordinates." = "保留相机与时间，去掉 GPS 坐标。";
+"Keyboard Shortcuts" = "快捷键一览";
+"Keyboard shortcuts" = "快捷键一览";
 "Language" = "语言";
 "Large 1-inch / passport" = "大一寸 / 小二寸 / 护照";
 "Large 2-inch" = "大二寸";
@@ -149,6 +156,8 @@
 "Merge" = "合并";
 "Merge all images into one PDF" = "把所有图片合并成一个 PDF";
 "Missing tools" = "缺少依赖";
+"Move %@ down" = "把 %@ 下移";
+"Move %@ up" = "把 %@ 上移";
 "Move down" = "下移";
 "Move the pages you list to the front; the rest follow in order." = "把列出的页移到最前，其余按原顺序跟随。";
 "Move up" = "上移";
@@ -166,7 +175,7 @@
 "One per page" = "每页一张";
 "Only shrinks — a smaller image is never enlarged." = "只会缩小，比它小的图不会被放大。";
 "Open" = "打开";
-"Open Output Folder" = "打开输出文件夹";
+"Open Output Folder" = "打开输出目录";
 "Open output folder" = "打开输出目录";
 "Open output folder when finished" = "完成后打开输出文件夹";
 "Original" = "原始尺寸";
@@ -200,9 +209,13 @@
 "Red" = "红底";
 "Release notes and downloads" = "发行说明与下载";
 "Release to add" = "松开以添加";
+"Remove" = "移除";
+"Remove %d files" = "移除 %d 个文件";
+"Remove Selected" = "移除选中项";
 "Remove all metadata" = "去掉全部元数据";
 "Remove from list" = "从列表移除";
 "Remove location" = "去掉位置信息";
+"Removed %d file(s)" = "已移除 %d 个文件";
 "Rendering failed." = "渲染失败。";
 "Rendering preview…" = "正在生成预览…";
 "Reorder pages" = "重排页面";
@@ -212,6 +225,8 @@
 "Rotate" = "旋转";
 "Scale" = "倍数";
 "Scanned PDF" = "扫描成 PDF";
+"Select All" = "全选";
+"Show Output in Finder" = "在访达中显示输出";
 "Show all %d" = "展开全部 %d 条";
 "Show all formats" = "显示全部格式";
 "Show fewer" = "收起";
@@ -253,7 +268,9 @@
 "Two per page" = "每页两张";
 "Two per page needs a fixed paper size, so A4 is used." = "每页两张需要固定纸张尺寸，因此使用 A4。";
 "US visa" = "美国签证";
+"Undo" = "撤销";
 "Unknown" = "未知";
+"Usage guide" = "使用说明";
 "Use Desktop" = "恢复默认（桌面）";
 "Version %@" = "版本 %@";
 "Web" = "网页";
