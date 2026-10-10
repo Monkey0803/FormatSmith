@@ -6,8 +6,16 @@ import Foundation
 /// 「72 DPI = 原始像素」的换算，所以同一个预设对两种输入都成立。
 public struct Preset: Identifiable, Sendable {
     public let id: String
-    public let name: String
-    public let detail: String
+    /// 名字与说明存的是**英文原文（也就是翻译表的 key）**，读取时才解析。
+    ///
+    /// 之前这里存的是 `Localized.text("Web")` 的结果 —— 而 `PresetLibrary.all` 是
+    /// `static let`，只会构造一次，于是预设名在第一次取用时就把语言定死了：
+    /// 界面其它地方都跟着切成了中文，预设框里还是英文。
+    let nameKey: String
+    let detailKey: String
+
+    public var name: String { Localized.text(nameKey) }
+    public var detail: String { Localized.text(detailKey) }
     public let systemImage: String
     /// 这个预设显式声明的改动。没声明的项由 `apply(to:)` 负责回到默认值。
     let mutations: @Sendable (inout ConversionSettings) -> Void
@@ -50,9 +58,9 @@ public enum PresetLibrary {
     public static let all: [Preset] = [
         Preset(
             id: "web",
-            name: Localized.text("Web"),
+            nameKey: "Web",
             // 144 DPI = 2 倍，正好是常见的高分屏尺寸
-            detail: Localized.text("PNG at 2× — crisp on Retina screens"),
+            detailKey: "PNG at 2× — crisp on Retina screens",
             systemImage: "globe"
         ) { settings in
             settings.target = .image(.png)
@@ -67,8 +75,8 @@ public enum PresetLibrary {
 
         Preset(
             id: "email",
-            name: Localized.text("Email"),
-            detail: Localized.text("JPEG, small enough to attach"),
+            nameKey: "Email",
+            detailKey: "JPEG, small enough to attach",
             systemImage: "envelope"
         ) { settings in
             settings.target = .image(.jpeg)
@@ -83,8 +91,8 @@ public enum PresetLibrary {
 
         Preset(
             id: "print",
-            name: Localized.text("Print"),
-            detail: Localized.text("TIFF at 300 DPI, lossless"),
+            nameKey: "Print",
+            detailKey: "TIFF at 300 DPI, lossless",
             systemImage: "printer"
         ) { settings in
             settings.target = .image(.tiff)
@@ -97,8 +105,8 @@ public enum PresetLibrary {
 
         Preset(
             id: "archive",
-            name: Localized.text("Archive"),
-            detail: Localized.text("PNG at original size, nothing thrown away"),
+            nameKey: "Archive",
+            detailKey: "PNG at original size, nothing thrown away",
             systemImage: "archivebox"
         ) { settings in
             settings.target = .image(.png)
@@ -111,8 +119,8 @@ public enum PresetLibrary {
 
         Preset(
             id: "idPhoto",
-            name: Localized.text("ID photo"),
-            detail: Localized.text("1-inch photo, blue background, 300 DPI"),
+            nameKey: "ID photo",
+            detailKey: "1-inch photo, blue background, 300 DPI",
             systemImage: "person.crop.rectangle"
         ) { settings in
             settings.target = .image(.jpeg)
@@ -128,8 +136,8 @@ public enum PresetLibrary {
 
         Preset(
             id: "photoSheet",
-            name: Localized.text("Photo sheet"),
-            detail: Localized.text("Fill a 6-inch sheet with 1-inch photos, ready to print"),
+            nameKey: "Photo sheet",
+            detailKey: "Fill a 6-inch sheet with 1-inch photos, ready to print",
             systemImage: "square.grid.3x3"
         ) { settings in
             settings.target = .image(.jpeg)
@@ -147,8 +155,8 @@ public enum PresetLibrary {
 
         Preset(
             id: "idScan",
-            name: Localized.text("ID scan"),
-            detail: Localized.text("Front and back of an ID on one A4 page"),
+            nameKey: "ID scan",
+            detailKey: "Front and back of an ID on one A4 page",
             systemImage: "creditcard"
         ) { settings in
             settings.target = .pdf
@@ -162,8 +170,8 @@ public enum PresetLibrary {
 
         Preset(
             id: "imagesToPDF",
-            name: Localized.text("Images to PDF"),
-            detail: Localized.text("One PDF, one page per image, at original size"),
+            nameKey: "Images to PDF",
+            detailKey: "One PDF, one page per image, at original size",
             systemImage: "doc.richtext"
         ) { settings in
             settings.target = .pdf
@@ -176,8 +184,8 @@ public enum PresetLibrary {
 
         Preset(
             id: "pdfToImages",
-            name: Localized.text("PDF to images"),
-            detail: Localized.text("PNG per page at 150 DPI"),
+            nameKey: "PDF to images",
+            detailKey: "PNG per page at 150 DPI",
             systemImage: "photo.on.rectangle.angled"
         ) { settings in
             settings.target = .image(.png)
@@ -189,8 +197,8 @@ public enum PresetLibrary {
 
         Preset(
             id: "scan",
-            name: Localized.text("Scanned PDF"),
-            detail: Localized.text("All images into one compressed PDF"),
+            nameKey: "Scanned PDF",
+            detailKey: "All images into one compressed PDF",
             systemImage: "doc.viewfinder"
         ) { settings in
             settings.target = .pdf

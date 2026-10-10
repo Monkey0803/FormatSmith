@@ -179,6 +179,11 @@ final class ConverterModel: ObservableObject {
         // 状态栏是最显眼的一处文案：它的语言对不对，日志里要能看见。
         // 之前正是这里在中文界面下露出英文，而所有测试都是绿的。
         DebugLog.log("status sample: \(StatusMessage.idle.resolved())")
+        // 预设名曾经因为「static let + 构造时解析」而在中文界面下一直是英文。
+        // 和状态栏同样处理：把解析结果打进日志，界面之外也能确认。
+        if let first = PresetLibrary.all.first {
+            DebugLog.log("preset sample: \(first.name)")
+        }
 
         if let data = UserDefaults.standard.data(forKey: defaultsKey),
             let decoded = try? JSONDecoder().decode(ConversionSettings.self, from: data)
