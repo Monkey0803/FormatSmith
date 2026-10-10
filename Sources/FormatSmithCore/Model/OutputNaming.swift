@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 /// 输出文件命名：模板展开、非法字符清理、重名唯一化。
@@ -85,8 +86,23 @@ public enum OutputNaming {
     }
 
     /// 若目标已存在，追加 -1、-2 … 直到找到空位。绝不覆盖用户已有文件。
+    /// 并发转换同时抢一个输出名。
+    ///
+    /// 竞态发生在**同一个进程内**（一次转换会并行跑几个文件），
+    /// 所以用一把锁加一份「已占名单」就够，不必在磁盘上落占位文件 ——
+    /// 那样一旦取消或失败，会留下 0 字节的假产出（这个坑我踩过，有测试盯着）。
+    private static let reservationLock = NSLock()
+    private static var reservedPaths: Set<String> = []
+
+    /// 原子地占住一个未被使用的输出名。先到先得。
     public static func uniqueURL(_ url: URL, fileManager: FileManager = .default) -> URL {
-        guard fileManager.fileExists(atPath: url.path) else { return url }
+        reservationLock.lock()
+        defer { reservationLock.unlock() }
+
+        if isFree(url, fileManager: fileManager) {
+            reservedPaths.insert(url.path)
+            return url
+        }
 
         let directory = url.deletingLastPathComponent()
         let ext = url.pathExtension
@@ -98,11 +114,24 @@ public enum OutputNaming {
                 directory
                 .appendingPathComponent("\(base)-\(index)")
                 .appendingPathExtension(ext)
-            if !fileManager.fileExists(atPath: candidate.path) {
+            if isFree(candidate, fileManager: fileManager) {
+                reservedPaths.insert(candidate.path)
                 return candidate
             }
             index += 1
         }
+        // 极端的编号耗尽（或目录不可写）：退回原名，交给写入方报错
         return url
+    }
+
+    private static func isFree(_ url: URL, fileManager: FileManager) -> Bool {
+        !fileManager.fileExists(atPath: url.path) && !reservedPaths.contains(url.path)
+    }
+
+    /// 仅供测试：清掉占位记录。
+    static func resetReservations() {
+        reservationLock.lock()
+        reservedPaths.removeAll()
+        reservationLock.unlock()
     }
 }
