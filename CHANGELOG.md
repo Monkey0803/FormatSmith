@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-10-10
+
+### Added
+
+- **Images can go straight to text.** Choosing *Text (.txt)* — or `--to text` — turns a photo or a
+  screenshot into a `.txt` file in one step, with no detour through PDF. PDFs use the same target and
+  keep the per-page rule: pages that already carry a text layer are reused, only scans are recognised.
+- Settings that cannot affect text output (quality, background, longest edge, metadata, ID photo) are
+  now correctly reported as inactive in that mode, and DPI applies only to PDF input, where it changes
+  the resolution the pages are recognised at.
+
+### Fixed
+
+- **Saved settings could silently reset on upgrade.** Swift's synthesised decoder requires every key to
+  be present, so adding *any* field to the settings made previously saved settings fail to decode —
+  and the caller recovers with `try?` plus defaults, so the user's configuration quietly reverted and
+  looked like their own mistake. Every field now decodes with `decodeIfPresent` (37 of them), which
+  makes future additions safe too.
+
 ## [1.4.0] - 2026-10-10
 
 ### Added
@@ -303,7 +322,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as output formats. Their size rules are undocumented and inconsistent; ICNS, for example, rejects
   64×64 and 1024×1024 while accepting 48×48.
 
-[Unreleased]: https://github.com/Monkey0803/FormatSmith/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/Monkey0803/FormatSmith/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/Monkey0803/FormatSmith/releases/tag/v1.5.0
 [1.4.0]: https://github.com/Monkey0803/FormatSmith/releases/tag/v1.4.0
 [1.3.0]: https://github.com/Monkey0803/FormatSmith/releases/tag/v1.3.0
 [1.2.0]: https://github.com/Monkey0803/FormatSmith/releases/tag/v1.2.0

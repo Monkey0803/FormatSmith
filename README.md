@@ -169,6 +169,7 @@ Set `FORMATSMITH_DEBUG=1` for a trace of file intake and metadata reads.
 - [x] Image → PDF (combine several images into one document)
 - [x] PDF toolbox: merge, split, extract pages, rotate, compress
 - [x] Documents → PDF (Office via LibreOffice, HTML natively, Markdown via pandoc)
+- [x] Text output: searchable PDFs, plus text extracted from scans, PDFs and photos (on-device OCR)
 Video and audio conversion is explicitly **not** in scope — that is a different stack, and it would
 make this a different app.
 
