@@ -99,6 +99,7 @@
 "Could not read this file." = "无法读取该文件。";
 "Could not render the page." = "无法渲染页面。";
 "Could not render the page: %@" = "无法渲染页面：%@";
+"Could not rotate the preview." = "无法旋转预览。";
 "Could not start the converter: %@" = "无法启动转换器：%@";
 "Could not write the PDF." = "无法写出 PDF。";
 "Create PDF" = "生成 PDF";
@@ -182,6 +183,7 @@
 "No face was detected, so the photo was centred instead." = "没有检测到人脸，已改为居中构图。";
 "No page matches this range." = "没有页码落在该范围内。";
 "No pages were selected to move." = "没有选中要移动的页。";
+"No pages were selected." = "没有选中任何页面。";
 "No person was detected, so the original background was kept." = "没有检测到人像，已保留原背景。";
 "No transparency" = "不支持透明";
 "Not available in this build yet." = "当前版本尚未提供该功能。";
