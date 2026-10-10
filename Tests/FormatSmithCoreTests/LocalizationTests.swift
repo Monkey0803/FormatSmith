@@ -183,6 +183,10 @@ final class LocalizationTests: XCTestCase {
         let patterns = [
             #"Localized\.text\(\s*"((?:[^"\\]|\\.)*)""#,
             #"StatusMessage\(\s*"((?:[^"\\]|\\.)*)""#,
+            // 预设把英文原文存成 key、读取时才解析（Preset.nameKey / detailKey）。
+            // 这两个入口不列上来的话，重新生成词表时会把这些翻译**删掉** —— 踩过一次。
+            #"nameKey:\s*"((?:[^"\\]|\\.)*)""#,
+            #"detailKey:\s*"((?:[^"\\]|\\.)*)""#,
         ]
 
         var keys = Set<String>()
