@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-10-10
+
+### Added
+
+- **Text output (OCR).** A scanned PDF becomes a `.txt` file. Pages that already carry a text layer are
+  reused as they are, and **only pages that are pure images are recognised** — a half-typed,
+  half-scanned document keeps its accurate text instead of being re-recognised wholesale. The result
+  reports how many pages had to be recognised.
+- **The queue shows what came out.** `Done · 5 file(s) written · 2.4 MB → 380 KB`, comparing the source
+  with the real size on disk.
+- **`--preset`** on the command line, by the ten preset names. A preset is a starting point: switches
+  given after it still win.
+- **Reordering by dragging a row**, using the platform's own list mechanism.
+
+### Fixed
+
+- **The toolbox preview contradicted the output.** On a three-page document, "Extract 3" previewed
+  page 1 while the output began with page 3; the page count shown was the input's; the Rotate preview
+  claimed rotated dimensions while the picture stayed put. The preview now takes its page order from
+  the same single source the real operations use, and a rotation tool rotates what you see.
+- **⌘A did nothing.** The item was added *next to* the system's own Select All, so two ⌘A collided and
+  the system's won — which does nothing when no text field has focus. The app now owns the key, and
+  asks the responder chain first, so ⌘A still selects text inside a text field.
+- **Escape did not clear the selection.** A menu shortcut for Escape is swallowed by the system's
+  cancel handling, and `onExitCommand` needs focus the queue does not have.
+- **The queue's selection, context menu and drag reordering were never wired to the interface.** The
+  model logic and its tests were all in place; the view code existed but was never attached to a row,
+  so clicking and dragging did nothing while the suite stayed green.
+
 ## [1.3.0] - 2026-10-10
 
 ### Added
@@ -274,7 +303,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as output formats. Their size rules are undocumented and inconsistent; ICNS, for example, rejects
   64×64 and 1024×1024 while accepting 48×48.
 
-[Unreleased]: https://github.com/Monkey0803/FormatSmith/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/Monkey0803/FormatSmith/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/Monkey0803/FormatSmith/releases/tag/v1.4.0
 [1.3.0]: https://github.com/Monkey0803/FormatSmith/releases/tag/v1.3.0
 [1.2.0]: https://github.com/Monkey0803/FormatSmith/releases/tag/v1.2.0
 [1.1.0]: https://github.com/Monkey0803/FormatSmith/releases/tag/v1.1.0
