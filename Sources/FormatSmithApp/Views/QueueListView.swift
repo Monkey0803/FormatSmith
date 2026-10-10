@@ -158,11 +158,35 @@ struct EmptyDropZone: View {
 
 // MARK: - 队列行
 
+/// 行的拖放：把拖动项放到当前行之前。
+struct QueueRowDropDelegate: DropDelegate {
+    let target: UUID
+    let model: ConverterModel
+    @Binding var dragged: UUID?
+
+    func dropEntered(info: DropInfo) {
+        guard let dragged, dragged != target else { return }
+        model.move(id: dragged, before: target)
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        dragged = nil
+        return true
+    }
+}
+
 struct QueueRowView: View {
     @EnvironmentObject private var model: ConverterModel
     let item: QueueItem
 
     private var isSelected: Bool { model.selection.contains(item.id) }
+
+    /// 正在被拖动的那一项，用于区分「拖动排序」与「别的拖拽」。
+    @State private var draggedID: UUID?
 
     var body: some View {
         HStack(spacing: 12) {

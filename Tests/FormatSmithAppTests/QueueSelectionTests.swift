@@ -173,3 +173,73 @@ final class QueueSelectionTests: XCTestCase {
         XCTAssertTrue(copied.contains("beta"))
     }
 }
+
+/// 拖拽排序：把一项移到另一项前面。
+@MainActor
+final class QueueReorderTests: XCTestCase {
+
+    private var directory: URL!
+
+    override func setUpWithError() throws {
+        directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("FormatSmithReorder-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    }
+
+    override func tearDownWithError() throws {
+        try? FileManager.default.removeItem(at: directory)
+        UserDefaults.standard.removeObject(forKey: "FormatSmith.settings.v2")
+    }
+
+    private func makeModel(_ names: [String]) async throws -> ConverterModel {
+        let model = ConverterModel()
+        model.settings.outputDirectoryPath = directory.path
+        var urls: [URL] = []
+        for name in names {
+            let context = try BitmapContext.make(width: 60, height: 40, wantsAlpha: false)
+            context.fill(with: .white)
+            let url = directory.appendingPathComponent("\(name).png")
+            try ImageEncoder.encode(try XCTUnwrap(context.makeImage()), format: .png, quality: 1)
+                .write(to: url)
+            urls.append(url)
+        }
+        model.add(urls: urls)
+        let deadline = Date().addingTimeInterval(20)
+        while model.convertibleItems.count < names.count, Date() < deadline {
+            try await Task.sleep(nanoseconds: 100_000_000)
+        }
+        return model
+    }
+
+    func testMovingForward() async throws {
+        let model = try await makeModel(["a", "b", "c", "d"])
+        let ids = model.items.map(\.id)
+        // 把 a 拖到 c 前面：期望 b, a, c, d
+        model.move(id: ids[0], before: ids[2])
+        XCTAssertEqual(model.items.map(\.name), ["b", "a", "c", "d"])
+    }
+
+    func testMovingBackward() async throws {
+        let model = try await makeModel(["a", "b", "c", "d"])
+        let ids = model.items.map(\.id)
+        // 把 d 拖到 b 前面：期望 a, d, b, c
+        model.move(id: ids[3], before: ids[1])
+        XCTAssertEqual(model.items.map(\.name), ["a", "d", "b", "c"])
+    }
+
+    func testMovingOntoItselfChangesNothing() async throws {
+        let model = try await makeModel(["a", "b"])
+        let ids = model.items.map(\.id)
+        model.move(id: ids[0], before: ids[0])
+        XCTAssertEqual(model.items.map(\.name), ["a", "b"])
+    }
+
+    func testNothingIsLostOrDuplicated() async throws {
+        let model = try await makeModel(["a", "b", "c", "d", "e"])
+        let ids = model.items.map(\.id)
+        model.move(id: ids[4], before: ids[0])
+        model.move(id: ids[1], before: ids[3])
+        XCTAssertEqual(model.items.count, 5, "排序不该丢项或重复")
+        XCTAssertEqual(Set(model.items.map(\.name)).count, 5)
+    }
+}

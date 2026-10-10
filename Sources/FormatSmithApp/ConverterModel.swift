@@ -614,6 +614,23 @@ final class ConverterModel: ObservableObject {
         recentlyRemoved = nil
     }
 
+    /// 把一项移到另一项前面（拖拽排序用）。
+    ///
+    /// 用「移到谁前面」而不是「移到第几位」：拖动过程中目标是会变的，
+    /// 记位置容易在项数变化时错位。
+    func move(id: UUID, before targetID: UUID) {
+        guard id != targetID,
+            let from = items.firstIndex(where: { $0.id == id }),
+            let to = items.firstIndex(where: { $0.id == targetID })
+        else { return }
+
+        let moving = items.remove(at: from)
+        // 移除之后目标可能前移一位
+        let insertion = from < to ? to - 1 : to
+        items.insert(moving, at: min(insertion, items.count))
+        scheduleOutputPreview()
+    }
+
     // MARK: 选中
 
     func select(id: UUID, extending: Bool, toggling: Bool) {
