@@ -9,7 +9,7 @@ enum ItemStatus: Equatable {
     case loading
     case ready
     case converting(done: Int, total: Int)
-    case finished(files: Int, folder: URL?, outputs: [URL] = [])
+    case finished(files: Int, folder: URL?, outputs: [URL] = [], bytes: Int64 = 0)
     case failed(String)
 
     var isTerminal: Bool {
@@ -870,10 +870,16 @@ final class ConverterModel: ObservableObject {
         if let error = result.error {
             items[idx].status = .failed(error.message)
         } else {
+            // 顺手记下产出的实际大小：用户最关心的往往就是「到底小了多少」
+            let bytes = result.outputFiles.reduce(Int64(0)) { total, url in
+                let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size]) as? NSNumber
+                return total + (size?.int64Value ?? 0)
+            }
             items[idx].status = .finished(
                 files: result.producedCount,
                 folder: result.outputFolder,
-                outputs: result.outputFiles
+                outputs: result.outputFiles,
+                bytes: bytes
             )
         }
     }
@@ -928,7 +934,7 @@ final class ConverterModel: ObservableObject {
         var summary = BatchSummary(outputFolder: folder, cancelled: cancelled)
         for item in items {
             switch item.status {
-            case .finished(let files, _, _):
+            case .finished(let files, _, _, _):
                 summary.succeeded += 1
                 summary.outputCount += files
             case .failed(let message):

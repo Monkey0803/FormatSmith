@@ -172,11 +172,70 @@ final class BatchSummaryTests: XCTestCase {
         try await run(model)
 
         let item = try XCTUnwrap(model.items.first)
-        guard case let .finished(files, _, outputs) = item.status else {
+        guard case let .finished(files, _, outputs, _) = item.status else {
             return XCTFail("完成状态应当记录产出文件，否则没法把结果拖出去")
         }
         XCTAssertEqual(files, 1)
         XCTAssertEqual(outputs.count, 1)
         XCTAssertEqual(outputs.first?.pathExtension, "png")
+    }
+}
+
+/// 队列在完成后要能报出「产出多大」。
+///
+/// 用户最关心的往往就是压缩效果：源文件多大、产出多大。
+@MainActor
+final class OutputSizeTests: XCTestCase {
+
+    func testFinishedItemCarriesTheOutputSize() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("FormatSmithSize-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: directory)
+            UserDefaults.standard.removeObject(forKey: "FormatSmith.settings.v2")
+        }
+
+        // 造一张有内容的图，保证产出不是 0 字节
+        let context = try BitmapContext.make(width: 800, height: 600, wantsAlpha: false)
+        for index in stride(from: 0, to: 800, by: 40) {
+            context.setFillColor(
+                CGColor(red: Double(index) / 800.0, green: 0.4, blue: 0.6, alpha: 1)
+            )
+            context.fill(CGRect(x: index, y: 0, width: 20, height: 600))
+        }
+        let image = try XCTUnwrap(context.makeImage())
+        let source = directory.appendingPathComponent("stripes.png")
+        try ImageEncoder.encode(image, format: .png, quality: 1).write(to: source)
+
+        let model = ConverterModel()
+        model.settings.outputDirectoryPath = directory.appendingPathComponent("out").path
+        model.settings.format = .jpeg
+        model.settings.quality = 0.5
+        model.add(urls: [source])
+
+        let ready = Date().addingTimeInterval(20)
+        while model.convertibleItems.isEmpty, Date() < ready {
+            try await Task.sleep(nanoseconds: 100_000_000)
+        }
+
+        model.startConversion()
+        let deadline = Date().addingTimeInterval(60)
+        while model.isConverting, Date() < deadline {
+            try await Task.sleep(nanoseconds: 200_000_000)
+        }
+
+        let item = try XCTUnwrap(model.items.first)
+        guard case let .finished(_, _, outputs, bytes) = item.status else {
+            return XCTFail("应当是完成状态，实际 \(item.status)")
+        }
+        XCTAssertFalse(outputs.isEmpty, "应当记录产出文件")
+        XCTAssertGreaterThan(bytes, 0, "应当记录产出的实际字节数")
+
+        // 与磁盘上的真实大小一致
+        let onDisk = try XCTUnwrap(
+            (try FileManager.default.attributesOfItem(atPath: outputs[0].path)[.size]) as? NSNumber
+        ).int64Value
+        XCTAssertEqual(bytes, onDisk, "报出来的大小必须等于磁盘上的真实大小")
     }
 }

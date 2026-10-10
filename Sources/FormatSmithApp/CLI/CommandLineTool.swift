@@ -71,6 +71,19 @@ enum CommandLineTool {
                     }
                 }
 
+            case "--preset":
+                let names = PresetLibrary.all.map(\.id).joined(separator: ", ")
+                // nextValue 有副作用（会吃掉下一个参数），所以只调用一次：
+                // 在报错信息里再调一次会把后面的开关当成预设名，报出「未知预设：--out」这种鬼话。
+                let requested = nextValue(argument) ?? ""
+                let preset = PresetLibrary.all.first { $0.id.lowercased() == requested.lowercased() }
+                guard let preset else {
+                    fail("Unknown preset: \(requested). Use one of: \(names).")
+                }
+                // 预设会先恢复默认再套用，所以放在这里等于「以这个预设作为起点」，
+                // 后面显式给出的开关仍然可以覆盖它。
+                settings = preset.applied(to: settings)
+
             case "--metadata":
                 let names = MetadataPolicy.allCases.map(\.rawValue).joined(separator: ", ")
                 guard let value = nextValue(argument), let policy = MetadataPolicy(rawValue: value) else {
@@ -468,6 +481,7 @@ enum CommandLineTool {
               --background <c>      white | black | transparent
               --subfolder           Create a subfolder per source file
               PDF toolbox (input and output are both PDF):
+              --preset <name>       \(PresetLibrary.all.map(\.id).joined(separator: " | "))
               --pdf-tool <tool>     \(PDFTool.allCases.map(\.cliName).joined(separator: " | "))
               --page-order <list>   Page order for reorder, e.g. 3,1,2 (rest follow; nothing is dropped)
               --split-every <n>     Pages per file when splitting (default 1)

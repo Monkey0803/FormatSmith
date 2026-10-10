@@ -281,7 +281,7 @@ struct QueueRowView: View {
 
         if case .finished = item.status {
             Button(Localized.text("Show Output in Finder")) {
-                if case let .finished(_, folder, _) = item.status, let folder {
+                if case let .finished(_, folder, _, _) = item.status, let folder {
                     model.reveal(folder)
                 }
             }
@@ -297,7 +297,7 @@ struct QueueRowView: View {
 
     /// 拖拽内容：一份文件就拖文件本身，多份就拖所在文件夹。
     private var dragProvider: NSItemProvider {
-        guard case let .finished(_, folder, outputs) = item.status else {
+        guard case let .finished(_, folder, outputs, _) = item.status else {
             return NSItemProvider()
         }
         if outputs.count == 1, let only = outputs.first {
@@ -310,7 +310,7 @@ struct QueueRowView: View {
     }
 
     private var dragHelp: String {
-        guard case let .finished(_, _, outputs) = item.status else {
+        guard case let .finished(_, _, outputs, _) = item.status else {
             return Localized.text("Show in Finder")
         }
         return outputs.count == 1
@@ -365,8 +365,18 @@ struct QueueRowView: View {
             return Localized.text("%d page(s) · ready", item.document.pageCount)
         case let .converting(done, total):
             return Localized.text("Converting %d of %d", done, total)
-        case let .finished(files, _, _):
-            return Localized.text("Done · %d image(s) written", files)
+        case let .finished(files, _, _, bytes):
+            let written = Localized.text("Done · %d image(s) written", files)
+            guard bytes > 0 else { return written }
+            let produced = ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+            // 有源文件大小时给出对照，没有就只说产出多大
+            if item.document.byteSize > 0 {
+                let original = ByteCountFormatter.string(
+                    fromByteCount: item.document.byteSize, countStyle: .file
+                )
+                return "\(written) · \(original) → \(produced)"
+            }
+            return "\(written) · \(produced)"
         case let .failed(message):
             return Localized.text("Failed: %@", message)
         }
@@ -397,7 +407,7 @@ struct QueueRowView: View {
             .foregroundStyle(Color.accentColor)
         case .finished:
             Button {
-                if case let .finished(_, folder, _) = item.status, let folder {
+                if case let .finished(_, folder, _, _) = item.status, let folder {
                     model.reveal(folder)
                 }
             } label: {
