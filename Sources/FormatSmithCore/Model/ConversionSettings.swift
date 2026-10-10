@@ -85,6 +85,9 @@ public struct ConversionSettings: Codable, Equatable, Sendable {
     public var format: ImageFormat = .png
     /// 输出是否为 PDF。
     public var producesPDF: Bool = false
+    /// 目标是纯文本。跟 producesPDF 一样是「存在哪」的细节，外面一律看 `target`。
+    /// 默认 false：老版本存下来的设置里没有这个键，解码后自然是 false。
+    public var producesText: Bool = false
     /// 有损格式的压缩质量，0.05–1.0。
     public var quality: Double = 0.9
     /// 转换后怎么处理原始元数据（EXIF / GPS / 相机信息）。
@@ -170,13 +173,21 @@ public struct ConversionSettings: Codable, Equatable, Sendable {
 
     /// 当前目标。
     public var target: OutputTarget {
-        get { producesPDF ? .pdf : .image(format) }
+        get {
+            if producesText { return .text }
+            return producesPDF ? .pdf : .image(format)
+        }
         set {
             switch newValue {
             case .pdf:
                 producesPDF = true
+                producesText = false
+            case .text:
+                producesText = true
+                producesPDF = false
             case let .image(newFormat):
                 producesPDF = false
+                producesText = false
                 format = newFormat
             }
         }
@@ -286,4 +297,54 @@ public struct ConversionSettings: Codable, Equatable, Sendable {
             background = .white
         }
     }
+    // MARK: - 解码
+
+    /// 逐个字段容错解码。
+    ///
+    /// 合成的解码器**要求每个键都存在**：只要某次升级新增了一个字段，
+    /// 老版本存下来的设置就会整个解码失败，而调用方是 `try?` + 默认值 ——
+    /// 结果是用户的设置静默回到默认，还以为是自己记错了。
+    /// 这里每个字段都用 decodeIfPresent，缺了就取默认值，新增字段才是安全的。
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        format = try container.decodeIfPresent(ImageFormat.self, forKey: .format) ?? .png
+        producesPDF = try container.decodeIfPresent(Bool.self, forKey: .producesPDF) ?? false
+        producesText = try container.decodeIfPresent(Bool.self, forKey: .producesText) ?? false
+        quality = try container.decodeIfPresent(Double.self, forKey: .quality) ?? 0.9
+        metadataPolicy = try container.decodeIfPresent(MetadataPolicy.self, forKey: .metadataPolicy) ?? .keep
+        resolutionMode = try container.decodeIfPresent(ResolutionMode.self, forKey: .resolutionMode) ?? .dpi
+        dpi = try container.decodeIfPresent(Double.self, forKey: .dpi) ?? 200
+        scale = try container.decodeIfPresent(Double.self, forKey: .scale) ?? 1
+        maxLongEdge = try container.decodeIfPresent(Int.self, forKey: .maxLongEdge) ?? 0
+        background = try container.decodeIfPresent(ImageBackground.self, forKey: .background) ?? .white
+        pageRangeMode = try container.decodeIfPresent(PageRangeMode.self, forKey: .pageRangeMode) ?? .all
+        pageRangeText = try container.decodeIfPresent(String.self, forKey: .pageRangeText) ?? ""
+        pageOrderText = try container.decodeIfPresent(String.self, forKey: .pageOrderText) ?? ""
+        outputDirectoryPath = try container.decodeIfPresent(String.self, forKey: .outputDirectoryPath) ?? ""
+        perFileSubfolder = try container.decodeIfPresent(Bool.self, forKey: .perFileSubfolder) ?? true
+        filenamePattern = try container.decodeIfPresent(String.self, forKey: .filenamePattern) ?? "{name}-{page}"
+        padsPageNumbers = try container.decodeIfPresent(Bool.self, forKey: .padsPageNumbers) ?? true
+        openFolderWhenFinished = try container.decodeIfPresent(Bool.self, forKey: .openFolderWhenFinished) ?? false
+        maxPixels = try container.decodeIfPresent(Int.self, forKey: .maxPixels) ?? 120_000_000
+        maxConcurrentFiles = try container.decodeIfPresent(Int.self, forKey: .maxConcurrentFiles) ?? 0
+        pdfTool = try container.decodeIfPresent(PDFTool.self, forKey: .pdfTool) ?? .merge
+        splitEveryPages = try container.decodeIfPresent(Int.self, forKey: .splitEveryPages) ?? 1
+        rotationAngle = try container.decodeIfPresent(RotationAngle.self, forKey: .rotationAngle) ?? .clockwise90
+        idPhotoEnabled = try container.decodeIfPresent(Bool.self, forKey: .idPhotoEnabled) ?? false
+        idPhotoSize = try container.decodeIfPresent(IDPhotoSize.self, forKey: .idPhotoSize) ?? .oneInch
+        idPhotoBackground = try container.decodeIfPresent(IDPhotoBackground.self, forKey: .idPhotoBackground) ?? .white
+        idPhotoAutoCrop = try container.decodeIfPresent(Bool.self, forKey: .idPhotoAutoCrop) ?? true
+        printSheetEnabled = try container.decodeIfPresent(Bool.self, forKey: .printSheetEnabled) ?? false
+        printSheet = try container.decodeIfPresent(PrintSheet.self, forKey: .printSheet) ?? .sixInch
+        printSheetMarginMM = try container.decodeIfPresent(Double.self, forKey: .printSheetMarginMM) ?? 2
+        printSheetGapMM = try container.decodeIfPresent(Double.self, forKey: .printSheetGapMM) ?? 1
+        printSheetCutGuides = try container.decodeIfPresent(Bool.self, forKey: .printSheetCutGuides) ?? true
+        mergeImagesIntoOnePDF = try container.decodeIfPresent(Bool.self, forKey: .mergeImagesIntoOnePDF) ?? true
+        pdfPageSize = try container.decodeIfPresent(PDFPageSize.self, forKey: .pdfPageSize) ?? .fitImage
+        pdfMargin = try container.decodeIfPresent(Double.self, forKey: .pdfMargin) ?? 24
+        pdfLayout = try container.decodeIfPresent(PDFPageLayout.self, forKey: .pdfLayout) ?? .onePerPage
+        pdfCompressesImages = try container.decodeIfPresent(Bool.self, forKey: .pdfCompressesImages) ?? false
+        pdfImageQuality = try container.decodeIfPresent(Double.self, forKey: .pdfImageQuality) ?? 0.85
+    }
+
 }

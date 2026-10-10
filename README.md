@@ -9,7 +9,8 @@
 locally through Apple's own frameworks — nothing is uploaded, and there is no third-party dependency
 in the app itself.
 
-> Status: PDF → image, image → image, image → PDF, the PDF toolbox and **document → PDF** all work
+> Status: PDF → image, image → image, image → PDF, the PDF toolbox, **document → PDF**
+> and **text output (OCR)** all work
 > today, in both the app and the CLI. See the [roadmap](#roadmap) for what is still coming.
 
 ## Features
@@ -57,8 +58,13 @@ in the app itself.
   Files keep the order you give them, and the queue has ↑ ↓ buttons, so "front on top" is under your
   control rather than decided by the file names.
 - **PDF toolbox**: merge several PDFs, split one every N pages, extract just the pages you list,
-  rotate every page by 90/180/270°, or compress by re-rasterising at a lower DPI. Compressing is
-  lossy by design and the app says so before you run it.
+  rotate every page by 90/180/270°, compress by re-rasterising at a lower DPI, or recognise the text
+  and write an invisible layer so scans become searchable. Compressing and recognising are lossy by
+  design and the app says so before you run it.
+- **Text output (OCR)**: a scanned PDF **or a photo** becomes a `.txt` file (`--to text`). For PDFs,
+  pages that already carry a text layer are reused as-is and only pages that are pure images are
+  recognised, so a half-typed, half-scanned document keeps its accurate text. Images have no text
+  layer to reuse, so they are recognised directly. Everything runs on-device.
 - **Documents → PDF**: Office, OpenDocument and RTF through a LibreOffice you already have; HTML,
   Markdown and plain text through the system WebKit, with no extra installation. Markdown uses pandoc
   when it is around and falls back to a built-in renderer when it is not.

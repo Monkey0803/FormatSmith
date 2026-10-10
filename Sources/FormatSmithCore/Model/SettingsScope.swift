@@ -54,6 +54,8 @@ public struct SettingsScope: Equatable, Sendable {
     public let hasPDFs: Bool
     public let hasDocuments: Bool
     public let targetIsPDF: Bool
+    /// 目标是纯文本。这时候绝大多数设置都用不上：产出的是文字，不是画面。
+    public let targetIsText: Bool
     /// 是否有输入真的有多页（决定页码范围是否有意义）
     public let hasMultiPageInput: Bool
     public let idPhotoEnabled: Bool
@@ -69,6 +71,7 @@ public struct SettingsScope: Equatable, Sendable {
         hasPDFs = documentKinds.contains { $0 == .pdf }
         hasDocuments = documentKinds.contains { $0.isDocument }
         targetIsPDF = target.isPDF
+        targetIsText = target.isText
         hasMultiPageInput = pageCounts.contains { $0 > 1 }
         idPhotoEnabled = settings.idPhotoEnabled
         pdfTool = settings.pdfTool
@@ -91,32 +94,37 @@ public struct SettingsScope: Equatable, Sendable {
         case .idPhoto:
             // 证件照只处理图片输入；但输出可以是图片，也可以是 PDF
             // （图片 → PDF 时同样按证件照规格出图，所以这里不能按目标排除）
-            return hasImages ? .active : .inactive
+            // 纯文本目标下「证件照」没有意义：产出的是一段文字，没有构图可言。
+            return hasImages && !targetIsText ? .active : .inactive
 
         case .photoSheet:
             // 相纸排版产出的是图片，PDF 目标下用不上
-            return hasImages && !targetIsPDF && idPhotoEnabled ? .active : .inactive
+            return hasImages && !targetIsPDF && !targetIsText && idPhotoEnabled ? .active : .inactive
 
         case .resolution:
+            // 纯文本目标下，DPI 只影响一件事：PDF 要先栅格化再识别，
+            // 图片则是拿原像素去识别，跟 DPI 无关。
+            if targetIsText { return hasPDFs ? .active : .inactive }
             // PDF 只有「渲染成图片」时才谈分辨率；PDF 工具箱与文档 → PDF 都用不到它
             return hasImages || (hasPDFs && !targetIsPDF) ? .active : .inactive
 
         case .maxLongEdge:
             // 证件照的尺寸由规格决定，最长边对它没有意义
-            return hasImages && !idPhotoEnabled ? .active : .inactive
+            return hasImages && !idPhotoEnabled && !targetIsText ? .active : .inactive
 
         case .background:
             // 证件照模式下底色由证件照规格决定，这里的「透明铺底」不参与
-            return hasImages && !idPhotoEnabled ? .active : .inactive
+            return hasImages && !idPhotoEnabled && !targetIsText ? .active : .inactive
 
         case .quality:
-            return (hasImages && !idPhotoEnabled || !targetIsPDF) ? .active : .inactive
+            return (hasImages && !idPhotoEnabled || !targetIsPDF) && !targetIsText ? .active : .inactive
 
         case .pageRange:
             // 页码只在这两处被引擎读取：
             //   PDF → 图片（按页渲染），以及工具箱里的「提取页」。
             // 合并、压缩、旋转都是把整份文件重新组织，给它们显示页码只会误导。
-            guard hasPDFs, hasMultiPageInput else { return .inactive }
+            // 导出文字现在处理整份文件，不按页码挑选
+            guard hasPDFs, hasMultiPageInput, !targetIsText else { return .inactive }
             if !targetIsPDF { return .active }
             // 工具箱里按页码工作的只有这三个：提取、重排、删除
             return pdfTool.usesPageSelection ? .active : .inactive
@@ -132,7 +140,7 @@ public struct SettingsScope: Equatable, Sendable {
 
         case .metadata:
             // 元数据是写在图片文件里的；PDF 输出走另一套（图片被嵌进页面）
-            return hasImages && !targetIsPDF ? .active : .inactive
+            return hasImages && !targetIsPDF && !targetIsText ? .active : .inactive
         }
     }
 

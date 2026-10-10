@@ -6,17 +6,23 @@ public enum OutputTarget: Hashable, Sendable {
     case image(ImageFormat)
     /// 导出成一个 PDF。
     case pdf
+    /// 导出成一个纯文本 .txt（图片直接识别，PDF 逐页取文字，没有文字层的才识别）。
+    case text
 
     public var displayName: String {
         switch self {
         case let .image(format): return format.displayName
         case .pdf: return "PDF"
+        case .text: return Localized.text("Text (.txt)")
         }
     }
 
     public var isPDF: Bool {
         self == .pdf
     }
+
+    /// 产出的是纯文本。
+    public var isText: Bool { self == .text }
 
     public var imageFormat: ImageFormat? {
         if case let .image(format) = self { return format }
@@ -44,6 +50,8 @@ public struct ConversionPlan: Equatable, Sendable {
         case documentToPDF
         /// PDF 工具箱：合并、拆分、提取、旋转、压缩
         case pdfToolbox
+        /// 图片或 PDF → 纯文本
+        case toText
     }
 
     public enum Availability: Equatable, Sendable {
@@ -94,6 +102,14 @@ public enum ConversionRouter {
         case (.pdf, .pdf):
             return ConversionPlan(kind: .pdfToolbox)
 
+        // PDF → 纯文本
+        case (.pdf, .text):
+            return ConversionPlan(kind: .toText)
+
+        // 图片 → 纯文本：直接识别，不必先转 PDF
+        case (.image, .text):
+            return ConversionPlan(kind: .toText)
+
         // 图片 → 图片
         case (.image(let identifier), .image(let format)):
             guard format.isWritableBySystem else {
@@ -128,6 +144,15 @@ public enum ConversionRouter {
         case (.html, .pdf), (.markdown, .pdf), (.plainText, .pdf):
             // HTML / Markdown / 纯文本走系统 WebKit，不需要额外安装任何东西。
             return ConversionPlan(kind: .documentToPDF)
+
+        // 文档 → 纯文本：也得先经过 PDF
+        case (.office, .text), (.html, .text), (.markdown, .text), (.plainText, .text):
+            return ConversionPlan(
+                kind: .documentToPDF,
+                availability: .unsupported(
+                    Localized.text("Convert documents to PDF first, then extract text.")
+                )
+            )
 
         // 文档 → 图片：必须先经过 PDF
         case (.office, .image), (.html, .image), (.markdown, .image), (.plainText, .image):

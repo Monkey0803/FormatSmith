@@ -105,3 +105,32 @@ final class QueueWiringTests: XCTestCase {
         )
     }
 }
+
+/// 输出目标的选择器里必须真的能选到「纯文本」。
+///
+/// 这一条是这次会话的教训：模型、引擎、路由都通了、测试也绿，
+/// 但界面没接线 —— 用户根本选不到，功能等于不存在。
+final class TargetPickerWiringTests: XCTestCase {
+
+    private func panelSource() throws -> String {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        return try String(
+            contentsOf: root.appendingPathComponent(
+                "Sources/FormatSmithApp/Views/Panels/ConversionSettingsPanel.swift"
+            ),
+            encoding: .utf8
+        )
+    }
+
+    func testTextTargetIsOfferedInThePicker() throws {
+        let source = try panelSource()
+        XCTAssertTrue(
+            source.contains("OutputTarget.text"),
+            "选择器里没有纯文本目标，用户选不到这个功能"
+        )
+        XCTAssertTrue(source.contains("OutputTarget.pdf"), "PDF 目标不该被挤掉")
+    }
+}

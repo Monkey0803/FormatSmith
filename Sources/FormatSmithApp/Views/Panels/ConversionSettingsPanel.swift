@@ -110,6 +110,7 @@ struct ConversionSettingsPanel: View {
                 }
                 SwiftUI.Section(Localized.text("Documents")) {
                     Text("PDF").tag(OutputTarget.pdf)
+                    Text(OutputTarget.text.displayName).tag(OutputTarget.text)
                 }
             }
             .labelsHidden()

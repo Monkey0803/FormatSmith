@@ -84,6 +84,7 @@
 "Conversion finished" = "转换完成";
 "Convert" = "转换";
 "Convert Now" = "开始转换";
+"Convert documents to PDF first, then extract text." = "先把文档转成 PDF，再导出文字。";
 "Convert documents to PDF first, then to images." = "文档需要先转成 PDF，再转成图片。";
 "Converting %@ to %@ is not supported." = "不支持把 %@ 转换为 %@。";
 "Converting %d file(s), %d at a time…" = "正在转换 %d 个文件，每次 %d 个…";
@@ -113,10 +114,8 @@
 "Documents" = "文档";
 "Done" = "完成";
 "Done · %d image(s) written" = "完成 · 已输出 %d 张图片";
-"Drag %@ to reorder" = "拖动 %@ 以重新排序";
 "Drag the output folder out, or click to show it in Finder" = "可拖出输出文件夹，点击则在访达中显示";
 "Drag the result out, or click to show it in Finder" = "可直接拖出结果，点击则在访达中显示";
-"Drag to reorder" = "拖动以重新排序";
 "Drop files here" = "把文件拖到这里";
 "Drop files here, or click “Choose Files” to start." = "把文件拖到这里，或点击「选择文件」开始。";
 "Drop the pages you list; nothing else moves." = "删掉列出的页，其余保持原顺序。";
@@ -188,6 +187,7 @@
 "No pages were selected to move." = "没有选中要移动的页。";
 "No pages were selected." = "没有选中任何页面。";
 "No person was detected, so the original background was kept." = "没有检测到人像，已保留原背景。";
+"No text was recognised in this image." = "这张图里没有识别出文字。";
 "No transparency" = "不支持透明";
 "Not available in this build yet." = "当前版本尚未提供该功能。";
 "Not found" = "未找到";
@@ -218,6 +218,7 @@
 "Page ranges apply to PDF input only; images are always exported whole." = "页码范围仅对 PDF 生效，图片始终整张导出。";
 "Pages" = "页面范围";
 "Pages per file" = "每个文件的页数";
+"Pages that already have a text layer are reused; only scans are recognised." = "已有文字层的页面直接复用，只有扫描页才做识别。";
 "Parallel files" = "并行文件数";
 "Paste" = "粘贴";
 "Photo sheet" = "相纸排版";
@@ -267,12 +268,14 @@
 "Switches immediately; no restart needed." = "切换后立即生效，无需重启。";
 "TIFF at 300 DPI, lossless" = "300 DPI 无损 TIFF";
 "Text" = "文本";
+"Text (.txt)" = "纯文本（.txt）";
 "That would remove every page; no pages were selected to delete." = "这会把所有页面都删掉：没有选中要删除的页。";
 "The computed output size is invalid. Lower the resolution." = "计算出的尺寸无效，请降低分辨率。";
 "The converter did not finish in time." = "转换器没有在限定时间内完成。";
 "The converter did not finish within %d seconds." = "转换器在 %d 秒内没有完成。";
 "The converter failed (exit %d): %@" = "转换器失败（退出码 %d）：%@";
 "The first file in the list goes on top — use ↑ ↓ to reorder." = "列表中在前的一张排在上面——可用 ↑ ↓ 调整顺序。";
+"The image is recognised with on-device OCR." = "图片将用本机 OCR 识别。";
 "The output would be about %.0f megapixels, over the %.0f megapixel safety limit. Lower the DPI or scale." = "输出约为 %.0f 百万像素，超过 %.0f 百万像素的安全上限，请降低 DPI 或倍数。";
 "The page range is empty or invalid." = "页码范围为空或不合法。";
 "The subject is cut out with on-device person segmentation." = "人像用系统本地的人像分割自动抠出，照片不会离开这台机器。";
@@ -306,6 +309,7 @@
 "Write a separate PDF every N pages." = "每 N 页输出一个独立的 PDF。";
 "Write the text to a .txt file — existing text layers are reused, scans are recognised." = "把文字写成 .txt：本来就有的文字层直接复用，扫描件才去识别。";
 "Writes no camera, time or location information." = "不写入任何相机、时间或地点信息。";
+"Written as plain text (.txt)." = "产出为纯文本（.txt）。";
 "Zero-pad page numbers (1 → 001)" = "页码补零（1 → 001）";
 "a square image, %d–%d px per side" = "边长 %d–%d 像素的正方形图片";
 "e.g. 1-3,5,8-10" = "例如 1-3,5,8-10";

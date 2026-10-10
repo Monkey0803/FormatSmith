@@ -55,6 +55,8 @@ enum CommandLineTool {
                     let key = value.lowercased()
                     if key == "pdf" {
                         settings.target = .pdf
+                    } else if key == "txt" || key == "text" {
+                        settings.target = .text
                     } else if let format = allFormats.first(where: {
                         $0.identifier == key || $0.fileExtension == key || $0.displayName.lowercased() == key
                     }) {
@@ -424,7 +426,7 @@ enum CommandLineTool {
             let name = format.displayName.padding(toLength: width, withPad: " ", startingAt: 0)
             print("\(name)  .\(format.fileExtension)  \(format.summary)")
         }
-        print("\nPDF can also be used as a target: --to pdf")
+        print("\nPDF and plain text can also be targets: --to pdf | --to text")
         if !FormatRegistry.readOnlyNotable.isEmpty {
             let names = FormatRegistry.readOnlyNotable.map(\.displayName).joined(separator: ", ")
             print("Readable but not writable on macOS: \(names)")
@@ -468,6 +470,7 @@ enum CommandLineTool {
             Targets:
               --to png | jpeg | heic | avif | tiff | gif | bmp | jp2 | psd | tga | exr | pbm | ico
               --to pdf              Combine images, run a PDF tool, or convert a document
+              --to text             Recognise text on-device and write a .txt file
 
             Options:
               --quality <0.05-1>    Quality for lossy formats (default 0.9)

@@ -56,6 +56,13 @@ public final class OutputPreviewSession: @unchecked Sendable {
             return try OutputPreview.previewDocumentPage(
                 document: first, settings: settings, maxPixels: maxPixels
             )
+
+        case .toText:
+            // 预览显示将被识别的源，并由说明写清楚产出是文字。
+            // 不在这里跑 OCR：预览跟着设置变化反复重算，每次都识别代价太高。
+            return try OutputPreview.previewTextSource(
+                document: first, settings: settings, maxPixels: maxPixels, session: self
+            )
         }
     }
 
@@ -316,6 +323,37 @@ public enum OutputPreview {
     }
 
     // MARK: - PDF 工具箱
+
+    /// 纯文本目标的预览：显示将要被识别的源，并说明产出是文字。
+    fileprivate static func previewTextSource(
+        document: SourceDocument,
+        settings: ConversionSettings,
+        maxPixels: Int,
+        session: OutputPreviewSession
+    ) throws -> Result {
+        let source: Result
+        if document.kind.isPDFLike {
+            source = try previewToolboxPage(document: document, settings: settings, maxPixels: maxPixels)
+        } else {
+            source = try previewImage(
+                document: document, settings: settings, maxPixels: maxPixels, session: session
+            )
+        }
+
+        return Result(
+            image: source.image,
+            kind: source.kind,
+            caption: source.caption,
+            notes: [
+                Localized.text("Written as plain text (.txt)."),
+                document.kind.isPDFLike
+                    ? Localized.text("Pages that already have a text layer are reused; only scans are recognised.")
+                    : Localized.text("The image is recognised with on-device OCR."),
+            ],
+            fileCount: 1,
+            pageCount: source.pageCount
+        )
+    }
 
     /// 把一张图按 90 的倍数旋转（预览用）。
     fileprivate static func rotatedCopy(of image: CGImage, degrees: Int) throws -> CGImage {

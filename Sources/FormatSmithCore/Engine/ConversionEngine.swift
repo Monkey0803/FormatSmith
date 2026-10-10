@@ -118,6 +118,15 @@ public enum ConversionEngine {
                 fileCount: fileCount
             )
 
+        case .toText:
+            return convertToText(
+                document: document,
+                settings: settings,
+                cancellation: cancellation,
+                fileIndex: fileIndex,
+                fileCount: fileCount
+            )
+
         case .pdfToolbox:
             return runPDFTool(
                 documents: [document],
@@ -584,6 +593,75 @@ public enum ConversionEngine {
             padsPageNumbers: settings.padsPageNumbers
         )
         return "\(base).\(fileExtension)"
+    }
+
+    // MARK: - 导出纯文本
+
+    /// 图片或 PDF → 一个 .txt。
+    ///
+    /// 两条路的共同点是「文字从哪来」：PDF 先看有没有文字层（有就直接用），
+    /// 图片没有文字层可看，只能识别。
+    private static func convertToText(
+        document: SourceDocument,
+        settings: ConversionSettings,
+        cancellation: CancellationFlag,
+        fileIndex: Int,
+        fileCount: Int
+    ) -> ConversionResult {
+        let started = Date()
+        do {
+            let folder = try outputFolder(for: document, settings: settings)
+            let target = folder.appendingPathComponent(
+                pdfFileName(for: document, settings: settings, extension: "txt")
+            )
+            let observerBox = ProgressReporter(observer: .none, fileIndex: fileIndex, fileCount: fileCount)
+
+            if document.kind.isPDFLike {
+                let outcome = try PDFToolkit.extractText(
+                    url: document.url,
+                    settings: settings,
+                    to: target,
+                    cancellation: cancellation,
+                    onPageDone: { done, total in observerBox.report(completed: done, total: total) }
+                )
+                return ConversionResult(
+                    documentID: document.id,
+                    outputFiles: [outcome.url],
+                    outputFolder: folder,
+                    producedCount: 1,
+                    duration: Date().timeIntervalSince(started),
+                    notes: outcome.recognisedPages > 0
+                        ? [
+                            Localized.text(
+                                "%d page(s) had no text layer and were recognised.",
+                                outcome.recognisedPages
+                            )
+                        ]
+                        : []
+                )
+            }
+
+            let outcome = try ImageTextExporter.extractText(
+                url: document.url,
+                to: target,
+                cancellation: cancellation
+            )
+            return ConversionResult(
+                documentID: document.id,
+                outputFiles: [outcome.url],
+                outputFolder: folder,
+                producedCount: 1,
+                duration: Date().timeIntervalSince(started),
+                notes: outcome.lineCount == 0
+                    ? [Localized.text("No text was recognised in this image.")]
+                    : []
+            )
+        } catch {
+            return ConversionResult(
+                documentID: document.id,
+                error: error as? ConversionError ?? ConversionError("\(error)")
+            )
+        }
     }
 
     // MARK: - 图片 → 图片
