@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-10
+
+### Added
+
+- **Searchable PDFs (OCR).** A scanned PDF becomes searchable: each page is rasterised, the text is
+  recognised on-device with Vision, and an **invisible** text layer is written on top. What you see is
+  still the original scan; what you search, select and copy is real text. Marked as lossy, like
+  Compress, because the pages are rebuilt.
+- **Reorder and delete PDF pages.** *Reorder* moves the pages you list to the front and keeps the rest
+  in order — it never drops a page, so a typo cannot silently cost you pages. *Delete* removes the
+  pages you list. Both share the page-list field with Extract, labelled for what each one does.
+- **Metadata policy** — *Keep everything* (the new default), *Remove location*, or *Remove all
+  metadata* (`--metadata`). Previously camera, capture time and GPS were silently discarded.
+- **Animated GIFs keep their animation** when the target is GIF and nothing resizes the image, with
+  frame delays and loop count preserved. When animation cannot be kept (another format, or a resize)
+  the result says so and points at GIF instead of quietly returning one frame.
+- **About panel** replaced the system default: version, repository and download links, and the fact
+  that files never leave the machine. The empty state now lists the three steps for a first run.
+
+### Fixed
+
+- **Rotating a photo twice.** Now that metadata is carried over, the EXIF orientation had to be
+  cleared: the pixels are already uprighted during decode, so writing the tag back would make viewers
+  rotate an already-correct image. Verified with an orientation-6 source (800×600 in, 600×800 out,
+  orientation 1). Stale pixel dimensions are dropped for the same reason.
+- **`3,1` did not mean 3 then 1.** The page-range parser sorts its result, which is right for a set of
+  pages but destroys a page *order* — reorder could not work. Added an order-preserving parse, now
+  used by both Reorder and Extract.
+- **Picking Delete with the range mode left on "All" could only fail.** Choosing a page-list tool now
+  switches the mode to custom, so the state is never a dead end.
+- The README claimed Office conversion was "(Not wired up yet.)" while Word → PDF works; the note now
+  describes reality (LibreOffice is detected, not bundled).
+
 ## [1.1.0] - 2026-09-16
 
 ### Added
@@ -211,6 +244,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as output formats. Their size rules are undocumented and inconsistent; ICNS, for example, rejects
   64×64 and 1024×1024 while accepting 48×48.
 
-[Unreleased]: https://github.com/Monkey0803/FormatSmith/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/Monkey0803/FormatSmith/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/Monkey0803/FormatSmith/releases/tag/v1.2.0
 [1.1.0]: https://github.com/Monkey0803/FormatSmith/releases/tag/v1.1.0
 [1.0.0]: https://github.com/Monkey0803/FormatSmith/releases/tag/v1.0.0
