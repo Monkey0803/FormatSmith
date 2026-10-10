@@ -18,7 +18,10 @@ struct QueueListView: View {
                 // 用原生 List 的 .onMove 做拖拽排序。
                 // 之前自己用 onDrag/onDrop 拼了两次都没能拖动（先是补丁没接线，
                 // 后来是整行手势互抢），换成系统自带的机制就不再猜手势仲裁了。
-                List {
+                // selection 交给 List 原生处理：点击、⌘ 加选、⇧ 选区都是系统行为。
+                // 绝不能再用 onTapGesture —— 它会和 .onMove 抢同一次按下，拖拽就起不来，
+                // 这也是前几轮「拖不动」的真正原因（换了 List 但手势冲突还在）。
+                List(selection: $model.selection) {
                     ForEach(model.items) { item in
                         QueueRowView(item: item)
                             .listRowInsets(
@@ -221,17 +224,7 @@ struct QueueRowView: View {
                     lineWidth: 1
                 )
         )
-        // 整行可点：不加 contentShape 的话空白处不参与命中测试，点起来会时灵时不灵
         .contentShape(Rectangle())
-        .onTapGesture {
-            // onTapGesture 不带修饰键，直接读当前按键状态
-            let flags = NSEvent.modifierFlags
-            model.select(
-                id: item.id,
-                extending: flags.contains(.shift),
-                toggling: flags.contains(.command)
-            )
-        }
         .contextMenu { contextMenu }
         .localizedText(model.language)
     }

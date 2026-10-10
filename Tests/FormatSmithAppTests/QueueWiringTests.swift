@@ -24,8 +24,8 @@ final class QueueWiringTests: XCTestCase {
         let source = try queueSource()
 
         let required: [(String, String)] = [
-            (".onTapGesture", "点击选中没挂上：行还是死的"),
-            ("model.select(", "点击没有落到模型的选中逻辑上"),
+            ("List(selection:", "选中没有交给 List 原生机制"),
+            (".onMove {", "没有挂 onMove"),
             (".contextMenu { contextMenu }", "右键菜单定义了却没挂到行上"),
             (".onMove {", "没有挂原生拖拽排序（List 的 onMove）"),
             (".accessibilityLabel", "图标按钮缺无障碍标签"),
@@ -44,7 +44,7 @@ final class QueueWiringTests: XCTestCase {
     func testReorderingUsesTheNativeListMechanism() throws {
         let source = try queueSource()
 
-        XCTAssertTrue(source.contains("List {"), "队列应当是原生 List")
+        XCTAssertTrue(source.contains("List(selection:"), "队列应当是原生 List，并接管选中")
         XCTAssertTrue(source.contains(".onMove {"), "排序必须挂 onMove")
         XCTAssertFalse(
             source.contains("QueueRowDropDelegate"),
@@ -57,7 +57,16 @@ final class QueueWiringTests: XCTestCase {
     }
 
     /// ESC 取消全选必须挂在视图层。
-    func testEscapeIsHandledOnTheViewNotTheMenu() throws {
+    /// 行上绝不能有 onTapGesture：它会和 .onMove 抢同一次按下，拖拽就起不来。
+    func testRowHasNoTapGestureCompetingWithDrag() throws {
+        let source = try queueSource()
+        XCTAssertFalse(
+            source.contains(".onTapGesture"),
+            "行上还有 onTapGesture，会和拖拽抢手势（这正是三轮拖不动的原因）"
+        )
+    }
+
+    func testEscapeIsHandledByALocalMonitorNotByFocus() throws {
         let root = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
@@ -66,7 +75,16 @@ final class QueueWiringTests: XCTestCase {
             contentsOf: root.appendingPathComponent("Sources/FormatSmithApp/Views/ContentView.swift"),
             encoding: .utf8
         )
-        XCTAssertTrue(content.contains(".onExitCommand"), "ESC 没有挂 onExitCommand")
+        // ESC 走本地事件监听：不依赖焦点（onExitCommand 需要焦点、菜单的 escape 会被系统吃掉）
+        let model = try String(
+            contentsOf: root.appendingPathComponent("Sources/FormatSmithApp/ConverterModel.swift"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(
+            model.contains("addLocalMonitorForEvents"),
+            "ESC 没有本地事件监听，焦点不在队列上时按了不会有反应"
+        )
+        XCTAssertTrue(model.contains("keyCode == 53"), "监听里没有判断 ESC 键码")
 
         let app = try String(
             contentsOf: root.appendingPathComponent("Sources/FormatSmithApp/FormatSmithApp.swift"),

@@ -614,6 +614,25 @@ final class ConverterModel: ObservableObject {
         recentlyRemoved = nil
     }
 
+    /// ESC 取消全选。
+    ///
+    /// 试过两种「正统」写法都不行：菜单上的 .escape 会被系统当「取消」在菜单层吃掉；
+    /// 视图上的 .onExitCommand 需要该视图有焦点，队列没焦点时收不到。
+    /// 本地事件监听不依赖焦点，也不看手势仲裁，是这个窗口里最确定的一层。
+    func installEscapeHandler() {
+        guard escapeMonitor == nil else { return }
+        escapeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            // 53 是 ESC
+            guard event.keyCode == 53, let self else { return event }
+            guard !self.selection.isEmpty else { return event }
+            self.selection.removeAll()
+            DebugLog.log("escape: cleared selection")
+            return nil  // 吞掉事件，避免系统再拿它去「取消」别的状态
+        }
+    }
+
+    private var escapeMonitor: Any?
+
     /// 原生列表拖拽排序（对应 SwiftUI 的 onMove）。
     ///
     /// `destination` 是「插入点之前的下标」，移除源项之后还要再修正一次 ——
