@@ -28,7 +28,8 @@ final class QueueWiringTests: XCTestCase {
             ("model.select(", "点击没有落到模型的选中逻辑上"),
             (".contextMenu { contextMenu }", "右键菜单定义了却没挂到行上"),
             ("QueueRowDropDelegate(target:", "拖拽排序的委托定义了却没挂上"),
-            (".onDrag {", "行没有拖拽来源"),
+            (".onDrag {", "没有拖拽来源"),
+            ("dragHandle", "拖拽手柄定义了却没挂到行上"),
             (".accessibilityLabel", "图标按钮缺无障碍标签"),
             ("isSelected", "选中没有视觉反馈"),
         ]
@@ -53,6 +54,24 @@ final class QueueWiringTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(
             delegateCount, 2,
             "QueueRowDropDelegate 只出现 \(delegateCount) 次，多半是只定义没使用"
+        )
+    }
+
+    /// 拖拽必须挂在没有点击手势的地方，否则两个手势抢同一次按下，拖不起来。
+    func testDragLivesOnTheHandleNotTheWholeRow() throws {
+        let source = try queueSource()
+
+        let handleCount = source.components(separatedBy: "dragHandle").count - 1
+        XCTAssertGreaterThanOrEqual(
+            handleCount, 2, "手柄只出现 \(handleCount) 次，多半是只定义没使用"
+        )
+
+        // 行本身不该再有 onDrag：会和点击选中抢手势
+        let rowEnd = source.range(of: "private var dragHandle")?.lowerBound ?? source.endIndex
+        let rowBody = String(source[source.startIndex..<rowEnd])
+        XCTAssertFalse(
+            rowBody.contains(".onDrag {"),
+            "行主体上还挂着 onDrag，会和 onTapGesture 抢手势（这正是拖不动的原因）"
         )
     }
 

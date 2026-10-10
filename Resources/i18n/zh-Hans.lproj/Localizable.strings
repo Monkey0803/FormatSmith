@@ -90,7 +90,7 @@
 "Converting %d file(s)…" = "正在转换 %d 个文件…";
 "Converting %d of %d" = "转换中 %d/%d";
 "Copied %d name(s)." = "已复制 %d 个文件名。";
-"Copy" = "复制";
+"Copy" = "拷贝";
 "Copy File Name" = "复制文件名";
 "Copy File Names" = "复制文件名";
 "Could not create a drawing context." = "无法创建绘图上下文。";
@@ -104,6 +104,7 @@
 "Could not write the PDF." = "无法写出 PDF。";
 "Create PDF" = "生成 PDF";
 "Custom" = "自定义";
+"Cut" = "剪切";
 "Cut guides" = "裁切辅助线";
 "Dark" = "深色";
 "Delete pages" = "删除页面";
@@ -112,8 +113,10 @@
 "Documents" = "文档";
 "Done" = "完成";
 "Done · %d image(s) written" = "完成 · 已输出 %d 张图片";
+"Drag %@ to reorder" = "拖动 %@ 以重新排序";
 "Drag the output folder out, or click to show it in Finder" = "可拖出输出文件夹，点击则在访达中显示";
 "Drag the result out, or click to show it in Finder" = "可直接拖出结果，点击则在访达中显示";
+"Drag to reorder" = "拖动以重新排序";
 "Drop files here" = "把文件拖到这里";
 "Drop files here, or click “Choose Files” to start." = "把文件拖到这里，或点击「选择文件」开始。";
 "Drop the pages you list; nothing else moves." = "删掉列出的页，其余保持原顺序。";
@@ -216,6 +219,7 @@
 "Pages" = "页面范围";
 "Pages per file" = "每个文件的页数";
 "Parallel files" = "并行文件数";
+"Paste" = "粘贴";
 "Photo sheet" = "相纸排版";
 "Photographs shrink a lot; images with transparency are kept lossless." = "照片类图片体积可大幅下降；带透明通道的图片保持无损。";
 "Pixel limit" = "像素上限";

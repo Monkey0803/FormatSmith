@@ -204,6 +204,7 @@ struct QueueRowView: View {
             }
             Spacer(minLength: 6)
             statusBadge
+            dragHandle
             reorderButtons
             Button {
                 model.remove(id: item.id)
@@ -248,16 +249,29 @@ struct QueueRowView: View {
             )
         }
         .contextMenu { contextMenu }
-        // 整行可拖动排序。导出文件的那次拖拽挂在状态徽章上，两者不冲突。
-        .onDrag {
-            draggedID = item.id
-            return NSItemProvider(object: item.id.uuidString as NSString)
-        }
+        // 拖拽排序挂在行尾的手柄上，而不是整行：
+        // 整行同时有 onTapGesture（点击选中）时，拖拽往往起不来 —— 两个手势在抢同一次按下。
+        // 手柄上没有点击手势，结构上就不可能冲突。
         .onDrop(
             of: [.text],
             delegate: QueueRowDropDelegate(target: item.id, model: model, dragged: $draggedID)
         )
         .localizedText(model.language)
+    }
+
+    /// 拖拽手柄。拖到哪一项之前，就插到它前面。
+    private var dragHandle: some View {
+        Image(systemName: "line.3.horizontal")
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(.tertiary)
+            .frame(width: 20, height: 22)
+            .contentShape(Rectangle())
+            .onDrag {
+                draggedID = item.id
+                return NSItemProvider(object: item.id.uuidString as NSString)
+            }
+            .help(Localized.text("Drag to reorder"))
+            .accessibilityLabel(Localized.text("Drag %@ to reorder", item.document.displayName))
     }
 
     /// 上移 / 下移。多图合并成一页或一册时，顺序就是正反面顺序。

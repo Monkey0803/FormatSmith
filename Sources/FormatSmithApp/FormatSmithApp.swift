@@ -46,12 +46,39 @@ struct FormatSmithApp: App {
                     .keyboardShortcut("k", modifiers: [.command, .shift])
                     .disabled(model.items.isEmpty || model.isConverting)
             }
-            CommandGroup(after: .pasteboard) {
+            // 必须 replacing 而不是 after：`.after(.pasteboard)` 只是把「全选」加在系统自带的全选
+            // 旁边，两个 ⌘A 撞在一起，系统那个赢 —— 而它在没有文本框焦点时什么都不做，
+            // 表现就是「按 ⌘A 没反应」。
+            CommandGroup(replacing: .pasteboard) {
+                Button(Localized.text("Cut")) {
+                    NSApp.sendAction(#selector(NSText.cut(_:)), to: nil, from: nil)
+                }
+                .keyboardShortcut("x", modifiers: .command)
+
+                Button(Localized.text("Copy")) {
+                    NSApp.sendAction(#selector(NSText.copy(_:)), to: nil, from: nil)
+                }
+                .keyboardShortcut("c", modifiers: .command)
+
+                Button(Localized.text("Paste")) {
+                    NSApp.sendAction(#selector(NSText.paste(_:)), to: nil, from: nil)
+                }
+                .keyboardShortcut("v", modifiers: .command)
+
+                Button(Localized.text("Select All")) {
+                    // 有文本框在编辑时，⌘A 先归文本框；没人接手才轮到队列。
+                    // sendAction 返回 false 表示沿响应链没人处理。
+                    if !NSApp.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: nil) {
+                        model.selectAll()
+                    }
+                }
+                .keyboardShortcut("a", modifiers: .command)
+                .disabled(model.items.isEmpty)
+
                 Divider()
-                Button(Localized.text("Select All")) { model.selectAll() }
-                    .keyboardShortcut("a", modifiers: .command)
-                    .disabled(model.items.isEmpty)
+
                 Button(Localized.text("Deselect All")) { model.selection.removeAll() }
+                    .keyboardShortcut(.escape, modifiers: [])
                     .disabled(model.selection.isEmpty)
                 Button(Localized.text("Remove Selected")) { model.removeSelected() }
                     .keyboardShortcut(.delete, modifiers: [])
