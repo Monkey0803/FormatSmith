@@ -317,17 +317,51 @@ public enum OutputPreview {
 
     // MARK: - PDF 工具箱
 
+    /// 把一张图按 90 的倍数旋转（预览用）。
+    fileprivate static func rotatedCopy(of image: CGImage, degrees: Int) throws -> CGImage {
+        let normalised = ((degrees % 360) + 360) % 360
+        guard normalised != 0 else { return image }
+
+        let swaps = normalised % 180 != 0
+        let width = swaps ? image.height : image.width
+        let height = swaps ? image.width : image.height
+        let context = try BitmapContext.make(width: width, height: height, wantsAlpha: true)
+        context.translateBy(x: CGFloat(width) / 2, y: CGFloat(height) / 2)
+        context.rotate(by: CGFloat(normalised) * .pi / 180)
+        context.draw(
+            image,
+            in: CGRect(
+                x: -CGFloat(image.width) / 2, y: -CGFloat(image.height) / 2,
+                width: CGFloat(image.width), height: CGFloat(image.height)
+            )
+        )
+        guard let rotated = context.makeImage() else {
+            throw ConversionError(Localized.text("Could not rotate the preview."))
+        }
+        return rotated
+    }
+
     fileprivate static func previewToolboxPage(
         document: SourceDocument,
         settings: ConversionSettings,
         maxPixels: Int
     ) throws -> Result {
         let pdf = try PDFRasterizer.open(document.url)
-        guard let page = pdf.page(at: 1) else {
+        let total = pdf.numberOfPages
+        guard total > 0 else {
             throw ConversionError(Localized.text("This PDF has no pages."))
         }
 
-        let image = try PDFRasterizer.render(
+        // 预览要画的是**输出后的第一页**，不是输入的第一页：
+        // 「提取 3」「重排 3,1」的结果都以别的页开头。
+        let sequence = PDFToolkit.outputPageSequence(
+            tool: settings.pdfTool, settings: settings, pageCount: total
+        )
+        guard let firstPageNumber = sequence.first, let page = pdf.page(at: firstPageNumber) else {
+            throw ConversionError(Localized.text("No pages were selected."))
+        }
+
+        let rendered = try PDFRasterizer.render(
             page: page,
             scale: PDFRasterizer.previewScale(
                 for: page,
@@ -339,10 +373,20 @@ public enum OutputPreview {
             maxPixels: settings.maxPixels
         )
 
+        // 旋转工具会把页面转过去，那么预览也得转，否则图和说明互相矛盾
+        let rotates = settings.pdfTool == .rotate
+        let image =
+            rotates
+            ? (try rotatedCopy(of: rendered, degrees: settings.rotationAngle.rawValue))
+            : rendered
+
         let box = page.getBoxRect(.mediaBox)
-        let rotated = settings.rotationAngle.rawValue % 180 != 0
-        let shownWidth = rotated ? box.height : box.width
-        let shownHeight = rotated ? box.width : box.height
+        let swapped =
+            (settings.pdfTool == .rotate)
+            ? settings.rotationAngle.rawValue % 180 != 0
+            : false
+        let shownWidth = swapped ? box.height : box.width
+        let shownHeight = swapped ? box.width : box.height
         let caption = "\(Int(shownWidth.rounded())) × \(Int(shownHeight.rounded())) pt"
 
         return Result(
@@ -351,7 +395,7 @@ public enum OutputPreview {
             caption: caption,
             notes: [settings.pdfTool.summary],
             fileCount: 1,
-            pageCount: document.pageCount
+            pageCount: sequence.count
         )
     }
 

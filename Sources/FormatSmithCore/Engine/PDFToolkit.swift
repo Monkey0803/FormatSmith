@@ -130,6 +130,36 @@ public enum PDFToolkit {
         return try write(extracted, to: outputURL)
     }
 
+    // MARK: - 页序
+
+    /// 这个工具**实际会输出**的页序（元素是 1 起的原始页码）。
+    ///
+    /// 预览和真正的操作都从这里取。之前两边各算各的，于是预览永远画输入的第 1 页，
+    /// 而「提取 3」的输出以第 3 页开头 —— 一个专门用来展示真相的功能在展示假象。
+    public static func outputPageSequence(
+        tool: PDFTool,
+        settings: ConversionSettings,
+        pageCount: Int
+    ) -> [Int] {
+        guard pageCount > 0 else { return [] }
+        switch tool {
+        case .extract:
+            return settings.selectedPagesInOrder(outOf: pageCount)
+        case .reorder:
+            let wanted = settings.pageOrder(outOf: pageCount).filter { $0 >= 1 && $0 <= pageCount }
+            guard !wanted.isEmpty else { return Array(1...pageCount) }
+            let listed = Set(wanted)
+            return wanted + (1...pageCount).filter { !listed.contains($0) }
+        case .delete:
+            let removing = Set(settings.selectedPagesInOrder(outOf: pageCount))
+            let remaining = (1...pageCount).filter { !removing.contains($0) }
+            // 全删光是个错误状态，这里退回原样交给真正的操作去报错
+            return remaining.isEmpty ? Array(1...pageCount) : remaining
+        default:
+            return Array(1...pageCount)
+        }
+    }
+
     // MARK: - 导出文字
 
     /// 把文档的文字写成 .txt。
