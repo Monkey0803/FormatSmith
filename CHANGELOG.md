@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-10
+
+### Added
+
+- **Queue selection and batch removal.** Click to select, ⌘-click to add or remove, ⇧-click for a
+  range, ⌘A for all, ⌫ to remove the selection. Removing fifty files no longer means fifty clicks on a
+  small ×.
+- **A context menu on every row** — Show in Finder, Copy File Name, Remove (or "Remove N files"),
+  Show Output in Finder, Select All / Deselect All. Right-clicking a list is second nature on macOS;
+  these were previously only reachable through tiny row buttons.
+- **Undo after removing.** A bar offers "Removed N file(s) · Undo" and restores them **to their
+  original positions**, not appended at the end.
+- **Appearance: Follow system / Light / Dark**, remembered across launches.
+- **⌘1…⌘0 apply the ten presets**, and a *Keyboard Shortcuts* panel in the Help menu — shortcuts
+  nobody can find are shortcuts nobody uses.
+- **A notification when a long run finishes** (over 20 seconds). Recognising several hundred scanned
+  pages takes minutes; small batches stay quiet.
+- Accessibility labels on the icon-only row buttons (remove, move up, move down), which previously
+  announced nothing.
+
+### Fixed
+
+- **The status line stayed English in a Chinese interface.** The localization completeness test only
+  scanned `Localized.text(...)`, while status messages go through `StatusMessage(...)` — so 15 runtime
+  messages (added N files, converting, finished, output folder not writable …) had no translation
+  while the suite stayed green. The translations are in, and the scanner now covers both entry points.
+- **Switching from Dark back to Follow system did nothing.** SwiftUI's `preferredColorScheme` applies a
+  scheme but does not release it when the value becomes nil, so a light system kept a dark window. The
+  app now uses `NSApp.appearance`, where "follow system" genuinely means nothing is pinned.
+
 ## [1.2.0] - 2026-10-10
 
 ### Added
@@ -244,7 +274,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as output formats. Their size rules are undocumented and inconsistent; ICNS, for example, rejects
   64×64 and 1024×1024 while accepting 48×48.
 
-[Unreleased]: https://github.com/Monkey0803/FormatSmith/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/Monkey0803/FormatSmith/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/Monkey0803/FormatSmith/releases/tag/v1.3.0
 [1.2.0]: https://github.com/Monkey0803/FormatSmith/releases/tag/v1.2.0
 [1.1.0]: https://github.com/Monkey0803/FormatSmith/releases/tag/v1.1.0
 [1.0.0]: https://github.com/Monkey0803/FormatSmith/releases/tag/v1.0.0
