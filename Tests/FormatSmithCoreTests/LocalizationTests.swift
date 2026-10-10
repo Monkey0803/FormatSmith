@@ -173,20 +173,38 @@ final class LocalizationTests: XCTestCase {
     // MARK: - 扫描工具
 
     /// 从源码里扫出 `Localized.text("…")` 的 key（含跨行调用）。
+    /// 扫描源码里所有「最终会被用户看到」的文案 key。
+    ///
+    /// 只认 `Localized.text("…")` 是不够的 —— 状态栏文案走的是 `StatusMessage("…")`，
+    /// 于是十几条运行时消息（已添加 N 个文件、正在转换…）长期没有翻译，
+    /// 界面切成中文之后底部还是英文。这个漏网就是那次事故留下的教训：
+    /// **凡是通往界面的入口都要在这里列上**。
     static func localizedKeys(in source: String) -> Set<String> {
-        let pattern = try? NSRegularExpression(
-            pattern: #"Localized\.text\(\s*"((?:[^"\\]|\\.)*)""#,
-            options: [.dotMatchesLineSeparators]
-        )
-        guard let pattern else { return [] }
+        let patterns = [
+            #"Localized\.text\(\s*"((?:[^"\\]|\\.)*)""#,
+            #"StatusMessage\(\s*"((?:[^"\\]|\\.)*)""#,
+        ]
 
         var keys = Set<String>()
         let range = NSRange(source.startIndex..., in: source)
-        for match in pattern.matches(in: source, range: range) {
-            guard let keyRange = Range(match.range(at: 1), in: source) else { continue }
-            keys.insert(String(source[keyRange]))
+        for raw in patterns {
+            guard
+                let pattern = try? NSRegularExpression(
+                    pattern: raw, options: [.dotMatchesLineSeparators]
+                )
+            else { continue }
+            for match in pattern.matches(in: source, range: range) {
+                guard let keyRange = Range(match.range(at: 1), in: source) else { continue }
+                keys.insert(String(source[keyRange]))
+            }
         }
-        return keys
+        // 纯格式占位（例如 "%@"）只是转交参数，没有可翻译的内容
+        return keys.filter { !Self.isPureFormatPlaceholder($0) }
+    }
+
+    /// `"%@ %d"` 这种整串都是占位符的 key 不需要翻译。
+    static func isPureFormatPlaceholder(_ key: String) -> Bool {
+        key.range(of: #"^\s*(%[@dfsxu]|\s)+$"#, options: .regularExpression) != nil
     }
 
     /// 从 `"key" = "value";` 这样的行里取出 key。
@@ -295,5 +313,65 @@ final class StatusMessageTests: XCTestCase {
         XCTAssertTrue(StatusMessage("Finished: %d file(s) → %@", 1, "/tmp").isSuccess)
         XCTAssertTrue(StatusMessage("Merged %d images → %@", 2, "/tmp").isSuccess)
         XCTAssertFalse(StatusMessage("Cancelled.").isSuccess)
+    }
+}
+
+/// 状态栏文案的本地化。
+///
+/// 这组对应一次真实事故：界面切成中文之后，底部状态栏仍然是英文
+/// （截图里明晃晃的 “Drop files here, or click “Choose Files” to start.”）。
+/// 原因是状态消息走 `StatusMessage`，而完整性扫描只认 `Localized.text`，
+/// 于是 15 条运行时消息长期没有翻译，测试却一直是绿的。
+final class StatusMessageLocalizationTests: XCTestCase {
+
+    private func table() throws -> [String: String] {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let url = root.appendingPathComponent("Resources/i18n/zh-Hans.lproj/Localizable.strings")
+        return try XCTUnwrap(NSDictionary(contentsOf: url) as? [String: String])
+    }
+
+    /// 状态消息的每一条都必须有中文；漏了就会在中文界面下露出英文。
+    func testEveryStatusMessageUsedInCodeHasAChineseValue() throws {
+        let table = try table()
+
+        let messages: [StatusMessage] = [
+            .idle,
+            StatusMessage("Added %d file(s).", 1),
+            StatusMessage("Applied preset: %@", "x"),
+            StatusMessage("Cancelling…"),
+            StatusMessage("Converting %d file(s)…", 1),
+            StatusMessage("Converting %d file(s), %d at a time…", 2, 1),
+            StatusMessage("Copied %d name(s).", 1),
+            StatusMessage("Finished with %d failure(s).", 1),
+            StatusMessage("Finished: %d file(s) → %@", 1, "/tmp"),
+            StatusMessage("Ignored unsupported file: %@", "x"),
+            StatusMessage("Merged %d file(s) → %@", 1, "/tmp"),
+            StatusMessage("Output folder does not exist: %@", "/tmp"),
+            StatusMessage("Output folder is not writable: %@", "/tmp"),
+            StatusMessage("Restored %d file(s).", 1),
+        ]
+
+        for message in messages {
+            let value = table[message.key]
+            XCTAssertNotNil(value, "状态文案缺中文：\(message.key)")
+            XCTAssertNotEqual(value, message.key, "中文与英文原文相同，等于没翻译：\(message.key)")
+        }
+    }
+
+    func testTheIdleMessageSpecificallyIsChinese() throws {
+        // 屏幕上最先出现、也最显眼的一条
+        let value = try XCTUnwrap(try table()[StatusMessage.idle.key])
+        XCTAssertFalse(value.contains("Drop files here"), "实际：\(value)")
+        XCTAssertTrue(value.contains("选择文件") || value.contains("拖"), "实际：\(value)")
+    }
+
+    func testStatusKeysSurviveArgumentSubstitution() {
+        // key 里带占位符时，替换之后仍应保留数字与路径
+        let message = StatusMessage("Finished: %d file(s) → %@", 2, "/tmp/out")
+        XCTAssertTrue(message.key.contains("%d"))
+        XCTAssertTrue(message.key.contains("%@"))
     }
 }

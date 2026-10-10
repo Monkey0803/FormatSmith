@@ -128,6 +128,16 @@ final class ConverterModel: ObservableObject {
 
     static let languageKey = "FormatSmith.language"
 
+    /// 界面外观。跟语言一样是「偏好」而不是「转换设置」，
+    /// 所以不进 ConversionSettings，也不受预设影响。
+    @Published var appearance: AppAppearance {
+        didSet {
+            UserDefaults.standard.set(appearance.rawValue, forKey: Self.appearanceKey)
+        }
+    }
+
+    static let appearanceKey = "FormatSmith.appearance"
+
     private let cancellation = CancellationFlag()
     /// 每个正在转换的文件内部的进度，用于并发时合成整体进度。
     private var inFlightProgress: [UUID: Double] = [:]
@@ -135,6 +145,9 @@ final class ConverterModel: ObservableObject {
 
     init() {
         // 语言要在任何界面构建之前确定下来。
+        let storedAppearance = UserDefaults.standard.string(forKey: Self.appearanceKey)
+        appearance = storedAppearance.flatMap(AppAppearance.init(rawValue:)) ?? .system
+
         let stored = UserDefaults.standard.string(forKey: Self.languageKey)
         let resolved = stored.flatMap(AppLanguage.init(rawValue:)) ?? .system
         language = resolved
@@ -146,6 +159,9 @@ final class ConverterModel: ObservableObject {
                 + "(bundled: \(Localized.bundledLanguages().joined(separator: ", "))) "
                 + "sample: \(Localized.text("Output format"))"
         )
+        // 状态栏是最显眼的一处文案：它的语言对不对，日志里要能看见。
+        // 之前正是这里在中文界面下露出英文，而所有测试都是绿的。
+        DebugLog.log("status sample: \(StatusMessage.idle.resolved())")
 
         if let data = UserDefaults.standard.data(forKey: defaultsKey),
             let decoded = try? JSONDecoder().decode(ConversionSettings.self, from: data)

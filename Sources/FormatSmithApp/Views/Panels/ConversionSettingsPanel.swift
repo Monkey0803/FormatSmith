@@ -47,6 +47,7 @@ struct ConversionSettingsPanel: View {
                     BatchSummaryCard(model: model)
                 }
                 previewSection
+                appearanceSection
                 languageSection
             }
             .padding(16)
@@ -1011,6 +1012,29 @@ struct ConversionSettingsPanel: View {
     }
 
     // MARK: 语言
+
+    private var appearanceSection: some View {
+        SettingsCard(title: Localized.text("Appearance"), systemImage: "circle.lefthalf.filled") {
+            Picker(
+                "",
+                selection: Binding(
+                    get: { model.appearance },
+                    set: { model.appearance = $0 }
+                )
+            ) {
+                ForEach(AppAppearance.allCases) { option in
+                    Text(option.displayName).tag(option)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.segmented)
+
+            Text(Localized.text("Applies to this window only; conversions are unaffected."))
+                .font(.system(size: 11))
+                .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
 
     private var languageSection: some View {
         SettingsCard(title: Localized.text("Language"), systemImage: "character.bubble") {
