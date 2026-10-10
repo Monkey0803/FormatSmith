@@ -50,6 +50,8 @@ struct OutputPreviewState: Equatable {
     /// 会产出多少份文件 / 首份输出多少页。
     var fileCount: Int = 1
     var pageCount: Int = 1
+    /// 纯文本目标下真正会写出的文字（截取开头一段）。
+    var text: String?
     var isRendering = false
     var failure: String?
 
@@ -393,6 +395,7 @@ final class ConverterModel: ObservableObject {
                 notes: rendered.notes,
                 fileCount: rendered.fileCount,
                 pageCount: rendered.pageCount,
+                text: rendered.text,
                 isRendering: false,
                 failure: nil
             )

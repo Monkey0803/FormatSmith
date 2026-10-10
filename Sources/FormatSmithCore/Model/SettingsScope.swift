@@ -123,8 +123,9 @@ public struct SettingsScope: Equatable, Sendable {
             // 页码只在这两处被引擎读取：
             //   PDF → 图片（按页渲染），以及工具箱里的「提取页」。
             // 合并、压缩、旋转都是把整份文件重新组织，给它们显示页码只会误导。
-            // 导出文字现在处理整份文件，不按页码挑选
-            guard hasPDFs, hasMultiPageInput, !targetIsText else { return .inactive }
+            guard hasPDFs, hasMultiPageInput else { return .inactive }
+            // 导出文字也支持按页码挑选，而且与 pdfTool 无关
+            if targetIsText { return .active }
             if !targetIsPDF { return .active }
             // 工具箱里按页码工作的只有这三个：提取、重排、删除
             return pdfTool.usesPageSelection ? .active : .inactive

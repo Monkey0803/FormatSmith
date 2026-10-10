@@ -134,3 +134,29 @@ final class TargetPickerWiringTests: XCTestCase {
         XCTAssertTrue(source.contains("OutputTarget.pdf"), "PDF 目标不该被挤掉")
     }
 }
+
+/// 纯文本的预览必须把文字**渲染出来**，而不只是算出来。
+///
+/// 这次会话反复栽在同一件事上：数据算对了、测试绿了，但界面那一层没接上。
+/// 这里直接扫描源码，盯住「文字从 Core 传到界面、并且被画出来」这两步。
+final class TextPreviewWiringTests: XCTestCase {
+
+    private func source(_ relative: String) throws -> String {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        return try String(contentsOf: root.appendingPathComponent(relative), encoding: .utf8)
+    }
+
+    func testModelCarriesTheTextIntoTheViewState() throws {
+        let model = try source("Sources/FormatSmithApp/ConverterModel.swift")
+        XCTAssertTrue(model.contains("var text: String?"), "预览状态没有文字字段")
+        XCTAssertTrue(model.contains("text: rendered.text"), "Core 的文字没有传给界面状态")
+    }
+
+    func testViewActuallyRendersTheText() throws {
+        let view = try source("Sources/FormatSmithApp/Views/Panels/OutputPreviewView.swift")
+        XCTAssertTrue(view.contains("preview.text"), "界面没有使用预览里的文字")
+    }
+}

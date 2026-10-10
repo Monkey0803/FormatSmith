@@ -187,35 +187,59 @@ public enum PDFToolkit {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let target = OutputNaming.uniqueURL(outputURL)
 
+        // 按用户挑的页来（不挑就是全部）。顺序沿用书写顺序，与提取保持一致。
+        let wanted = settings.selectedPagesInOrder(outOf: pageCount)
+        guard !wanted.isEmpty else { throw ConversionError(Localized.text("No pages were selected.")) }
+
         let scale = max(settings.dpi, 72) / 72.0
         var sections: [String] = []
         var recognised = 0
 
-        for index in 1...pageCount {
+        for (offset, index) in wanted.enumerated() {
             if cancellation.isCancelled { throw ConversionError(Localized.text("Cancelled.")) }
 
-            let existing = (source.page(at: index - 1)?.string ?? "")
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            if !existing.isEmpty {
-                sections.append(existing)
-            } else if let page = raster.page(at: index) {
-                // 这一页没有文字层：栅格化后识别
-                let rendered = try PDFRasterizer.render(
-                    page: page, scale: scale, background: .white, format: .png,
-                    maxPixels: settings.maxPixels
-                )
-                let lines = (try? recognizer.lines(in: rendered)) ?? []
-                recognised += 1
-                sections.append(lines.map(\.text).joined(separator: "\n"))
-            }
+            let (text, didRecognise) = try pageText(
+                url: url, index: index, source: source, raster: raster,
+                scale: scale, settings: settings, recognizer: recognizer
+            )
+            if didRecognise { recognised += 1 }
+            sections.append(text)
 
-            onPageDone?(index, pageCount)
+            onPageDone?(offset + 1, wanted.count)
         }
 
         // 页与页之间空一行：既是可读的文本，也保留了分页信息
         let text = sections.joined(separator: "\n\n") + "\n"
         try Data(text.utf8).write(to: target, options: .atomic)
         return (target, recognised)
+    }
+
+    /// 一页的文字，以及「这一页是不是靠识别拿到的」。
+    ///
+    /// 预览与实际导出都走这里，避免两边各判断一次「有没有文字层」而渐渐不一致。
+    static func pageText(
+        url: URL,
+        index: Int,
+        source: PDFDocument,
+        raster: CGPDFDocument,
+        scale: Double,
+        settings: ConversionSettings,
+        recognizer: TextRecognizing
+    ) throws -> (text: String, recognised: Bool) {
+        let existing = (source.page(at: index - 1)?.string ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if !existing.isEmpty {
+            return (existing, false)
+        }
+        guard let page = raster.page(at: index) else { return ("", false) }
+
+        // 这一页没有文字层：栅格化后识别
+        let rendered = try PDFRasterizer.render(
+            page: page, scale: scale, background: .white, format: .png,
+            maxPixels: settings.maxPixels
+        )
+        let lines = (try? recognizer.lines(in: rendered)) ?? []
+        return (lines.map(\.text).joined(separator: "\n"), true)
     }
 
     // MARK: - 可搜索 PDF

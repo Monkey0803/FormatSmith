@@ -58,6 +58,22 @@ public struct VisionTextRecognizer: TextRecognizing {
 /// 动图取第一帧，与项目其它地方对动图的处理保持一致。
 public enum ImageTextExporter {
 
+    /// 只识别出文字，不写文件（预览用）。
+    ///
+    /// 与 `extractText` 共用同一段识别逻辑，避免预览与实际产出各走一套。
+    public static func recognisedText(
+        url: URL,
+        recognizer: TextRecognizing = VisionTextRecognizer()
+    ) throws -> String {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+            let image = CGImageSourceCreateImageAtIndex(source, 0, nil)
+        else {
+            throw ConversionError.unreadableFile()
+        }
+        let lines = (try? recognizer.lines(in: image)) ?? []
+        return lines.map(\.text).joined(separator: "\n")
+    }
+
     @discardableResult
     public static func extractText(
         url: URL,
@@ -75,12 +91,12 @@ public enum ImageTextExporter {
         // 识别失败（例如画面里没有文字）不该让整次转换算失败：产出一个空的 .txt，
         // 并在说明里讲清楚，比报错更有用。
         let lines = (try? recognizer.lines(in: image)) ?? []
+        let text = lines.map(\.text).joined(separator: "\n") + "\n"
 
         let directory = outputURL.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let target = OutputNaming.uniqueURL(outputURL)
 
-        let text = lines.map(\.text).joined(separator: "\n") + "\n"
         try Data(text.utf8).write(to: target, options: .atomic)
         return (target, lines.count)
     }

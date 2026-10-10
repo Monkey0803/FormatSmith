@@ -162,7 +162,8 @@ final class ImageToTextTests: XCTestCase {
             settings: ConversionSettings()
         )
         XCTAssertTrue(pdfScope.isActive(.resolution), "PDF 要先栅格化，DPI 影响识别质量")
-        XCTAssertFalse(pdfScope.isActive(.pageRange), "导出文字处理整份文件，不按页码挑")
+        // 导出文字现在支持按页码挑选（--pages），所以这一项是生效的
+        XCTAssertTrue(pdfScope.isActive(.pageRange), "多页 PDF 导出文字应当能挑页码")
         XCTAssertFalse(pdfScope.isActive(.pdfTool), "走的是新目标，不是工具箱")
     }
 
@@ -202,5 +203,171 @@ final class ImageToTextTests: XCTestCase {
 
         XCTAssertFalse(restored.producesText, "缺这个键时应当是「不是文字目标」")
         XCTAssertEqual(restored.target, .image(.jpeg), "老设置的图片格式必须原样恢复")
+    }
+}
+
+/// 纯文本目标的预览必须显示**真正会写出的文字**，而不是只画一张源图。
+///
+/// 一开始这里只画源图，等于什么都没告诉用户 —— 预览存在的意义就是所见即所得。
+final class TextPreviewTests: XCTestCase {
+
+    private var directory: URL!
+
+    override func setUpWithError() throws {
+        directory = try FixtureFactory.makeTemporaryDirectory()
+    }
+
+    override func tearDownWithError() throws {
+        try? FileManager.default.removeItem(at: directory)
+    }
+
+    private func settings() -> ConversionSettings {
+        var settings = ConversionSettings()
+        settings.target = .text
+        settings.outputDirectoryPath = directory.path
+        settings.filenamePattern = "out"
+        return settings
+    }
+
+    /// 注入固定识别结果：这样测的是「预览有没有把文字取出来并带上」，
+    /// 而不是「Vision 今天认不认得这张图」（那件事另有真跑 Vision 的用例）。
+    private struct StubRecognizer: TextRecognizing {
+        let text: String
+        func lines(in image: CGImage) throws -> [RecognizedLine] {
+            [RecognizedLine(text: text, bounds: CGRect(x: 0.1, y: 0.4, width: 0.5, height: 0.1))]
+        }
+    }
+
+    func testImagePreviewCarriesTheRecognisedText() throws {
+        let url = try FixtureFactory.makeTextImage("whatever", named: "note", in: directory)
+        let result = try OutputPreview.render(
+            documents: [SourceDocument.make(from: url)],
+            target: .text,
+            settings: settings(),
+            recognizer: StubRecognizer(text: "PREVIEWED WORDS")
+        )
+
+        XCTAssertEqual(result.kind, .text, "预览类型应当是文字")
+        XCTAssertEqual(result.text, "PREVIEWED WORDS", "预览必须带上识别出的文字")
+    }
+
+    func testPDFPreviewReusesTheTextLayerWithoutOCR() throws {
+        // 有文字层就不该去识别：注入的识别器会返回完全不同的文字，用它来区分
+        let pdf = try FixtureFactory.makeTextPDF(pages: [["Layer text here"]], named: "native", in: directory)
+        let result = try OutputPreview.render(
+            documents: [SourceDocument.make(from: pdf)],
+            target: .text,
+            settings: settings(),
+            recognizer: StubRecognizer(text: "SHOULD NOT APPEAR")
+        )
+
+        XCTAssertEqual(result.text, "Layer text here", "应当直接用文字层")
+    }
+
+    func testPDFPreviewFollowsTheChosenPages() throws {
+        let pdf = try FixtureFactory.makeTextPDF(
+            pages: [["Alpha"], ["Bravo"], ["Charlie"]], named: "three", in: directory
+        )
+        var chosen = settings()
+        chosen.pageRangeMode = .custom
+        chosen.pageRangeText = "3"
+
+        let result = try OutputPreview.render(
+            documents: [SourceDocument.make(from: pdf)], target: .text, settings: chosen
+        )
+        XCTAssertEqual(result.text, "Charlie", "挑了第 3 页，预览就该显示第 3 页")
+    }
+
+    func testEmptyRecognitionSaysSoInsteadOfShowingNothing() throws {
+        let url = try FixtureFactory.makeTextImage("x", named: "blank", in: directory)
+        let result = try OutputPreview.render(
+            documents: [SourceDocument.make(from: url)],
+            target: .text,
+            settings: settings(),
+            recognizer: StubRecognizer(text: "")
+        )
+        XCTAssertTrue(result.notes.contains { $0.contains("No text") }, "取不到文字必须有话说明：\(result.notes)")
+    }
+
+    func testLongTextIsTruncatedForDisplay() throws {
+        let long = String(repeating: "word ", count: 400)
+        let url = try FixtureFactory.makeTextImage("x", named: "long", in: directory)
+        let result = try OutputPreview.render(
+            documents: [SourceDocument.make(from: url)],
+            target: .text,
+            settings: settings(),
+            recognizer: StubRecognizer(text: long)
+        )
+        XCTAssertLessThanOrEqual(result.text?.count ?? 0, OutputPreview.previewTextLimit + 1)
+        XCTAssertTrue(result.text?.hasSuffix("…") == true, "截断要有省略号")
+    }
+
+    func testTextTargetCountsAsExpensive() {
+        // 预览会跑 OCR，界面必须用更长的防抖
+        XCTAssertTrue(
+            OutputPreview.isExpensive(
+                documents: [SourceDocument.make(from: directory.appendingPathComponent("x.png"))],
+                target: .text
+            ),
+            "纯文本目标要跑 OCR，必须算作昂贵路线"
+        )
+    }
+}
+
+/// 导出文字的页码选择必须真的生效（不只是界面显示）。
+final class TextPageSelectionTests: XCTestCase {
+
+    private var directory: URL!
+
+    override func setUpWithError() throws {
+        directory = try FixtureFactory.makeTemporaryDirectory()
+    }
+
+    override func tearDownWithError() throws {
+        try? FileManager.default.removeItem(at: directory)
+    }
+
+    private func run(pages: String?) throws -> String {
+        let pdf = try FixtureFactory.makeTextPDF(
+            pages: [["Alpha"], ["Bravo"], ["Charlie"]], named: "three", in: directory
+        )
+        var settings = ConversionSettings()
+        settings.target = .text
+        settings.outputDirectoryPath = directory.path
+        settings.perFileSubfolder = false
+        settings.filenamePattern = "out"
+        settings.mergeImagesIntoOnePDF = false
+        if let pages {
+            settings.pageRangeMode = .custom
+            settings.pageRangeText = pages
+        }
+
+        let result = ConversionEngine.convert(
+            document: SourceDocument.make(from: pdf), target: .text, settings: settings,
+            cancellation: CancellationFlag()
+        )
+        XCTAssertNil(result.error, "不该失败：\(result.error?.message ?? "")")
+        return try String(contentsOf: try XCTUnwrap(result.outputFiles.first), encoding: .utf8)
+    }
+
+    func testAllPagesByDefault() throws {
+        let text = try run(pages: nil)
+        XCTAssertTrue(text.contains("Alpha") && text.contains("Bravo") && text.contains("Charlie"))
+    }
+
+    func testOnlyTheChosenPage() throws {
+        let text = try run(pages: "2")
+        XCTAssertTrue(text.contains("Bravo"))
+        XCTAssertFalse(text.contains("Alpha"), "没挑的页不该出现：\(text)")
+        XCTAssertFalse(text.contains("Charlie"))
+    }
+
+    func testOrderFollowsWhatWasWritten() throws {
+        // 与「提取页」一致：3,1 就是先 3 后 1
+        let text = try run(pages: "3,1")
+        let charlie = try XCTUnwrap(text.range(of: "Charlie"))
+        let alpha = try XCTUnwrap(text.range(of: "Alpha"))
+        XCTAssertTrue(charlie.lowerBound < alpha.lowerBound, "写的顺序应当被保留：\(text)")
+        XCTAssertFalse(text.contains("Bravo"))
     }
 }

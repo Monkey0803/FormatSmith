@@ -21,6 +21,27 @@ struct OutputPreviewView: View {
                 )
             }
 
+            // 纯文本目标：把真正会写出的文字显示出来。
+            // 只放一张源图等于什么都没告诉用户 —— 预览的意义就是所见即所得。
+            if let text = preview.text, !text.isEmpty {
+                ScrollView {
+                    Text(text)
+                        .font(.system(size: 11, design: .monospaced))
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(8)
+                }
+                .frame(height: 140)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(Color(nsColor: .textBackgroundColor))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .strokeBorder(Color.secondary.opacity(0.15), lineWidth: 1)
+                )
+            }
+
             if preview.isRendering {
                 HStack(spacing: 6) {
                     ProgressView().controlSize(.small)

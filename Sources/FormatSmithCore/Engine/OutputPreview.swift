@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import PDFKit
 
 /// 预览会话：把「每张图的解码与人像分析」缓存下来。
 ///
@@ -17,7 +18,10 @@ public final class OutputPreviewSession: @unchecked Sendable {
         documents: [SourceDocument],
         target: OutputTarget,
         settings: ConversionSettings,
-        maxPixels: Int = OutputPreview.defaultMaxPixels
+        maxPixels: Int = OutputPreview.defaultMaxPixels,
+        /// 识别器可注入：测试用固定结果就能把「文字层怎么铺」单独测清楚，
+        /// 也让预览与导出在同一处指定识别方式。
+        recognizer: TextRecognizing = VisionTextRecognizer()
     ) throws -> OutputPreview.Result {
         // 尺寸与页数决定预览的尺寸说明和页数统计；
         // 调用方给的文件未必探测过，这里补一次（只读元数据，不解码像素）。
@@ -58,10 +62,12 @@ public final class OutputPreviewSession: @unchecked Sendable {
             )
 
         case .toText:
-            // 预览显示将被识别的源，并由说明写清楚产出是文字。
-            // 不在这里跑 OCR：预览跟着设置变化反复重算，每次都识别代价太高。
-            return try OutputPreview.previewTextSource(
-                document: first, settings: settings, maxPixels: maxPixels, session: self
+            return try OutputPreview.previewText(
+                document: first,
+                settings: settings,
+                maxPixels: maxPixels,
+                session: self,
+                recognizer: recognizer
             )
         }
     }
@@ -102,6 +108,8 @@ public enum OutputPreview {
         case pdfPage
         /// PDF → 图片
         case renderedPage
+        /// 导出纯文本：预览的主要内容是文字，不是画面
+        case text
     }
 
     public struct Result: Sendable {
@@ -117,6 +125,10 @@ public enum OutputPreview {
         public let fileCount: Int
         /// 首份输出有多少页。
         public let pageCount: Int
+        /// 纯文本输出时，真正会被写进 .txt 的内容（前面若干行）。
+        ///
+        /// 预览的意义就是所见即所得：只显示源图等于什么都没告诉用户。
+        public let text: String?
 
         public init(
             image: CGImage,
@@ -124,7 +136,8 @@ public enum OutputPreview {
             caption: String,
             notes: [String] = [],
             fileCount: Int = 1,
-            pageCount: Int = 1
+            pageCount: Int = 1,
+            text: String? = nil
         ) {
             self.image = image
             self.kind = kind
@@ -132,6 +145,7 @@ public enum OutputPreview {
             self.notes = notes
             self.fileCount = fileCount
             self.pageCount = pageCount
+            self.text = text
         }
     }
 
@@ -143,20 +157,25 @@ public enum OutputPreview {
         documents: [SourceDocument],
         target: OutputTarget,
         settings: ConversionSettings,
-        maxPixels: Int = defaultMaxPixels
+        maxPixels: Int = defaultMaxPixels,
+        recognizer: TextRecognizing = VisionTextRecognizer()
     ) throws -> Result {
         try OutputPreviewSession().render(
             documents: documents,
             target: target,
             settings: settings,
-            maxPixels: maxPixels
+            maxPixels: maxPixels,
+            recognizer: recognizer
         )
     }
 
     /// 文档 → PDF 需要真正转换一次，界面据此决定要不要等用户停下来再预览。
     public static func isExpensive(documents: [SourceDocument], target: OutputTarget) -> Bool {
         guard let first = documents.first else { return false }
-        return ConversionRouter.plan(input: first.kind, target: target).kind == .documentToPDF
+        let kind = ConversionRouter.plan(input: first.kind, target: target).kind
+        // 文档 → PDF 要跑 WebKit/LibreOffice；导出文字要跑 OCR。
+        // 两者都由界面用更长的防抖，避免每敲一个字就重算一遍。
+        return kind == .documentToPDF || kind == .toText
     }
 
     // MARK: - 各管线的渲染（由 OutputPreviewSession 调用）
@@ -324,38 +343,83 @@ public enum OutputPreview {
 
     // MARK: - PDF 工具箱
 
-    /// 纯文本目标的预览：显示将要被识别的源，并说明产出是文字。
-    fileprivate static func previewTextSource(
+    /// 纯文本目标的预览：显示**真正会写进 .txt 的文字**。
+    ///
+    /// 一开始这里只画源图——那等于什么都没告诉用户，而预览的意义就是所见即所得。
+    /// 只处理第一页/第一张：预览跟着设置反复重算，整份识别代价太高。
+    /// 取文字的逻辑与导出共用（PDF 走 PDFToolkit.pageText，图片走 ImageTextExporter）。
+    fileprivate static func previewText(
         document: SourceDocument,
         settings: ConversionSettings,
         maxPixels: Int,
-        session: OutputPreviewSession
+        session: OutputPreviewSession,
+        recognizer: TextRecognizing
     ) throws -> Result {
+        // 背景仍用源图/首页，让用户知道看的是哪一页
         let source: Result
         if document.kind.isPDFLike {
-            source = try previewToolboxPage(document: document, settings: settings, maxPixels: maxPixels)
+            source = try previewToolboxPage(
+                document: document, settings: settings, maxPixels: maxPixels
+            )
         } else {
             source = try previewImage(
                 document: document, settings: settings, maxPixels: maxPixels, session: session
             )
         }
 
+        var extracted = ""
+        if document.kind.isPDFLike {
+            guard let pdf = PDFDocument(url: document.url),
+                let raster = try? PDFRasterizer.open(document.url)
+            else { throw ConversionError.unreadablePDF() }
+
+            let wanted = settings.selectedPagesInOrder(outOf: pdf.pageCount)
+            if let first = wanted.first {
+                extracted =
+                    (try? PDFToolkit.pageText(
+                        url: document.url, index: first, source: pdf, raster: raster,
+                        scale: max(settings.dpi, 72) / 72.0, settings: settings,
+                        recognizer: recognizer
+                    ).text) ?? ""
+            }
+        } else {
+            extracted =
+                (try? ImageTextExporter.recognisedText(
+                    url: document.url, recognizer: recognizer
+                )) ?? ""
+        }
+
+        let trimmed = extracted.trimmingCharacters(in: .whitespacesAndNewlines)
+        // 只展示开头一段：预览要的是「对不对」，不是整份文本
+        let shown =
+            trimmed.count > Self.previewTextLimit
+            ? String(trimmed.prefix(Self.previewTextLimit)) + "…"
+            : trimmed
+
+        var notes: [String] = []
+        if trimmed.isEmpty {
+            notes.append(Localized.text("No text was recognised in this page."))
+        } else if document.kind.isPDFLike {
+            notes.append(
+                Localized.text("Only the first selected page is shown here; every selected page is written.")
+            )
+        }
+
         return Result(
             image: source.image,
-            kind: source.kind,
-            caption: source.caption,
-            notes: [
-                Localized.text("Written as plain text (.txt)."),
-                document.kind.isPDFLike
-                    ? Localized.text("Pages that already have a text layer are reused; only scans are recognised.")
-                    : Localized.text("The image is recognised with on-device OCR."),
-            ],
+            kind: .text,
+            caption: Localized.text("%d page(s) → one .txt", source.pageCount),
+            notes: notes,
             fileCount: 1,
-            pageCount: source.pageCount
+            pageCount: source.pageCount,
+            text: shown
         )
     }
 
-    /// 把一张图按 90 的倍数旋转（预览用）。
+    /// 预览里最多展示多少个字符。
+    static let previewTextLimit = 600
+
+    /// 把一张图按 90 的倍数旋转（预览用）。    /// 把一张图按 90 的倍数旋转（预览用）。
     fileprivate static func rotatedCopy(of image: CGImage, degrees: Int) throws -> CGImage {
         let normalised = ((degrees % 360) + 360) % 360
         guard normalised != 0 else { return image }
