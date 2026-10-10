@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-10-10
+
+### Added
+
+- **The text preview shows the text.** Choosing *Text (.txt)* now displays what will actually be
+  written, instead of only the source picture — a preview that shows the input tells you nothing about
+  the output.
+- **Page selection for PDF → text** (`--pages`), with the order you write preserved, matching
+  *Extract pages*. Choosing pages now also makes the panel show the page controls again.
+
+### Fixed
+
+- **Concurrent conversions overwrote each other's output — silently.** Converting 500 files with a
+  fixed filename pattern reported success 500 times while only 322 files landed: each task looked up a
+  free name, several computed the same one, and they wrote over each other. The same thing happened
+  with two same-named files from different folders under a `{name}` pattern. Output names are now
+  reserved atomically inside the process, so every file survives (verified: 500 files → 500 outputs,
+  all non-empty).
+- **Preset names and descriptions ignored the language setting.** `PresetLibrary.all` is a `static let`,
+  and the names were resolved once at construction, so switching to Simplified Chinese left the preset
+  tiles reading Web / Email / Print… The names now store the English key and resolve on every read.
+
 ## [1.5.0] - 2026-10-10
 
 ### Added
@@ -322,7 +344,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as output formats. Their size rules are undocumented and inconsistent; ICNS, for example, rejects
   64×64 and 1024×1024 while accepting 48×48.
 
-[Unreleased]: https://github.com/Monkey0803/FormatSmith/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/Monkey0803/FormatSmith/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/Monkey0803/FormatSmith/releases/tag/v1.6.0
 [1.5.0]: https://github.com/Monkey0803/FormatSmith/releases/tag/v1.5.0
 [1.4.0]: https://github.com/Monkey0803/FormatSmith/releases/tag/v1.4.0
 [1.3.0]: https://github.com/Monkey0803/FormatSmith/releases/tag/v1.3.0
