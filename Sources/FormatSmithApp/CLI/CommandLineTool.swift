@@ -301,7 +301,24 @@ enum CommandLineTool {
         var documents: [SourceDocument] = []
         var failures = 0
 
+        // 先展开文件夹，再处理。
+        //
+        // 不能在 `for input in inputs` 里往 inputs 追加：for-in 遍历的是循环开始时的副本，
+        // 追加进去的文件永远不会被处理 —— 那样文件夹等于还是被忽略，只是不再报错。
+        var expandedInputs: [String] = []
         for input in inputs {
+            let url = URL(fileURLWithPath: (input as NSString).expandingTildeInPath).standardizedFileURL
+            var isDirectory: ObjCBool = false
+            if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory),
+                isDirectory.boolValue
+            {
+                expandedInputs.append(contentsOf: InputExpansion.contents(of: url).map(\.path))
+            } else {
+                expandedInputs.append(input)
+            }
+        }
+
+        for input in expandedInputs {
             let url = URL(fileURLWithPath: (input as NSString).expandingTildeInPath).standardizedFileURL
             var isDirectory: ObjCBool = false
             guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) else {
@@ -309,8 +326,11 @@ enum CommandLineTool {
                 failures += 1
                 continue
             }
-            guard !isDirectory.boolValue else {
-                FileHandle.standardError.write("Skipping directory: \(url.path)\n".data(using: .utf8)!)
+            if isDirectory.boolValue {
+                // 已在上面展开过；走到这里说明是空文件夹
+                FileHandle.standardError.write(
+                    "No supported files in directory: \(url.path)\n".data(using: .utf8)!
+                )
                 failures += 1
                 continue
             }
@@ -403,6 +423,13 @@ enum CommandLineTool {
             } else {
                 let folder = result.outputFolder?.path ?? settings.resolvedOutputDirectory.path
                 print("✓ \(name) → \(result.producedCount) file(s)  \(folder)")
+            }
+
+            // 附注要打出来。界面上能看到「有 N 页没有文字层，已做识别」这类说明，
+            // 脚本里看不到就成了「同一个工具两副面孔」——
+            // 而这些附注往往正是判断这次转换是否如你所愿的关键。
+            for note in result.notes {
+                print("  · \(note)")
             }
         }
 

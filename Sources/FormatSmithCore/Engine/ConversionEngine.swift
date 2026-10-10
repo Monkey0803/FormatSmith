@@ -664,6 +664,26 @@ public enum ConversionEngine {
         }
     }
 
+    /// 输出很大时给一句实话：要占多少内存、以及怎么变小。
+    ///
+    /// 只在真的很大时才说，免得给正常图片添噪音。
+    /// 12 字节/像素来自实测（108MP 转 JPEG 峰值约 1259MB），是个保守的估算。
+    static func largeOutputWarning(
+        for document: SourceDocument,
+        settings: ConversionSettings
+    ) -> String? {
+        guard let size = settings.estimatedPixelSize(for: document.info) else { return nil }
+        let pixels = size.width * size.height
+        let megapixels = pixels / 1_000_000
+        guard megapixels >= 40 else { return nil }
+
+        let estimatedMB = pixels * 12 / 1_000_000
+        return Localized.text(
+            "%d-megapixel output: this needs roughly %d MB of memory. Set a longest edge to shrink it.",
+            megapixels, estimatedMB
+        )
+    }
+
     // MARK: - 图片 → 图片
 
     /// 解码、按需缩放，再按目标格式重新编码。
@@ -693,6 +713,12 @@ public enum ConversionEngine {
             )
 
             var notes: [String] = []
+
+            // 超大输出先提醒一句：实测 108MP 转 JPEG 峰值内存约 1.26GB，
+            // 差不多每像素 12 字节。用户多半想不到一张照片会吃掉一个多 G。
+            if let warning = largeOutputWarning(for: document, settings: settings) {
+                notes.append(warning)
+            }
 
             // 动图：只有「目标也是动图格式 + 没有改尺寸」时才可能原样保留，
             // 否则只能取第一帧 —— 那就必须说清楚，不能悄悄丢帧。

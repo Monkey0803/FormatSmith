@@ -458,17 +458,9 @@ final class ConverterModel: ObservableObject {
             guard manager.fileExists(atPath: url.path, isDirectory: &isDirectory) else { continue }
 
             if isDirectory.boolValue {
-                // 文件夹里的顺序是文件系统给的，不可靠，按名字排一下
-                let enumerator = manager.enumerator(
-                    at: url,
-                    includingPropertiesForKeys: [.isRegularFileKey, .contentTypeKey],
-                    options: [.skipsHiddenFiles, .skipsPackageDescendants]
-                )
-                var inside: [URL] = []
-                while let child = enumerator?.nextObject() as? URL, isSupported(child) {
-                    inside.append(child)
-                }
-                result.append(contentsOf: inside.sorted { Self.isOrderedBefore($0, $1) })
+                // 展开规则与命令行共用 InputExpansion：文件夹按名字排序，
+                // 显式给出的文件保持用户顺序（正反面顺序靠这个）。
+                result.append(contentsOf: InputExpansion.contents(of: url))
             } else if isSupported(url) {
                 result.append(url)
             } else {
@@ -491,10 +483,7 @@ final class ConverterModel: ObservableObject {
 
     /// 当前支持的输入：PDF、图片，以及能转成 PDF 的文档。
     private func isSupported(_ url: URL) -> Bool {
-        switch InputKind.detect(url: url) {
-        case .pdf, .image, .office, .html, .markdown, .plainText: return true
-        case .unknown: return false
-        }
+        InputExpansion.isSupported(url)
     }
 
     private func loadMetadata(for ids: [UUID]) {
