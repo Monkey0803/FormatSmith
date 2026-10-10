@@ -217,16 +217,45 @@ struct QueueRowView: View {
             .buttonStyle(.plain)
             .disabled(model.isConverting)
             .help(Localized.text("Remove from list"))
+            .accessibilityLabel(Localized.text("Remove %@", item.document.displayName))
         }
         .padding(.vertical, 7)
         .padding(.horizontal, 9)
         .background(
             RoundedRectangle(cornerRadius: 9, style: .continuous)
-                .fill(Color(nsColor: .textBackgroundColor).opacity(0.6))
+                .fill(
+                    isSelected
+                        ? Color.accentColor.opacity(0.16)
+                        : Color(nsColor: .textBackgroundColor).opacity(0.6)
+                )
         )
         .overlay(
             RoundedRectangle(cornerRadius: 9, style: .continuous)
-                .strokeBorder(Color.secondary.opacity(0.14), lineWidth: 1)
+                .strokeBorder(
+                    isSelected ? Color.accentColor.opacity(0.45) : Color.secondary.opacity(0.14),
+                    lineWidth: 1
+                )
+        )
+        // 整行可点：不加 contentShape 的话空白处不参与命中测试，点起来会时灵时不灵
+        .contentShape(Rectangle())
+        .onTapGesture {
+            // onTapGesture 不带修饰键，直接读当前按键状态
+            let flags = NSEvent.modifierFlags
+            model.select(
+                id: item.id,
+                extending: flags.contains(.shift),
+                toggling: flags.contains(.command)
+            )
+        }
+        .contextMenu { contextMenu }
+        // 整行可拖动排序。导出文件的那次拖拽挂在状态徽章上，两者不冲突。
+        .onDrag {
+            draggedID = item.id
+            return NSItemProvider(object: item.id.uuidString as NSString)
+        }
+        .onDrop(
+            of: [.text],
+            delegate: QueueRowDropDelegate(target: item.id, model: model, dragged: $draggedID)
         )
         .localizedText(model.language)
     }

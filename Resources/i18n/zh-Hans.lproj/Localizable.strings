@@ -232,6 +232,7 @@
 "Release notes and downloads" = "发行说明与下载";
 "Release to add" = "松开以添加";
 "Remove" = "移除";
+"Remove %@" = "移除 %@";
 "Remove %d files" = "移除 %d 个文件";
 "Remove Selected" = "移除选中项";
 "Remove all metadata" = "去掉全部元数据";
