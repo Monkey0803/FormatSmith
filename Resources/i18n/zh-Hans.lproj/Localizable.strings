@@ -20,10 +20,12 @@
 "%d of %d page(s) kept" = "保留 %d / %d 页";
 "%d page(s)" = "共 %d 页";
 "%d page(s) at %d DPI" = "%d 页 · %d DPI";
+"%d page(s) had no text layer and were recognised." = "有 %d 页没有文字层，已做识别。";
 "%d page(s) to recognise" = "识别 %d 页";
 "%d page(s) · ready" = "%d 页 · 就绪";
 "%d page(s) → %d file(s)" = "%d 页 → %d 个文件";
 "%d page(s) → 1 file" = "%d 页 → 1 个文件";
+"%d page(s) → one .txt" = "%d 页 → 一个 .txt";
 "%d page(s), %d moved to the front" = "%d 页，其中 %d 页移到最前";
 "%d succeeded" = "成功 %d 个";
 "%d × %d mm paper · %d photos per sheet" = "%d × %d 毫米相纸 · 每张 %d 张照片";
@@ -122,6 +124,7 @@
 "Everything else works without it." = "其余功能不受影响。";
 "Example name" = "示例文件名";
 "Extract pages" = "提取页面";
+"Extract text" = "导出纯文本";
 "Failed to encode %@." = "%@ 编码失败。";
 "Failed: %@" = "失败：%@";
 "File name" = "文件名";
@@ -294,6 +297,7 @@
 "Web" = "网页";
 "White" = "白色";
 "Write a separate PDF every N pages." = "每 N 页输出一个独立的 PDF。";
+"Write the text to a .txt file — existing text layers are reused, scans are recognised." = "把文字写成 .txt：本来就有的文字层直接复用，扫描件才去识别。";
 "Writes no camera, time or location information." = "不写入任何相机、时间或地点信息。";
 "Zero-pad page numbers (1 → 001)" = "页码补零（1 → 001）";
 "a square image, %d–%d px per side" = "边长 %d–%d 像素的正方形图片";

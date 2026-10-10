@@ -177,3 +177,167 @@ final class SearchablePDFTests: XCTestCase {
         XCTAssertEqual(PDFDocument(url: searchable)?.pageCount, 3)
     }
 }
+
+/// 导出纯文本。
+///
+/// 关键是**逐页判断**：已经有文字层的页直接用（准确、快），
+/// 只有没有文字层的页才去 OCR。整份一律重识别会把本来准确的文字换成识别结果。
+final class ExtractTextTests: XCTestCase {
+
+    private var directory: URL!
+    private var output: URL!
+
+    override func setUpWithError() throws {
+        directory = try FixtureFactory.makeTemporaryDirectory()
+        output = directory.appendingPathComponent("out", isDirectory: true)
+        try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+    }
+
+    override func tearDownWithError() throws {
+        try? FileManager.default.removeItem(at: directory)
+    }
+
+    /// 记录被调用次数，用来证明「有文字层时根本没去 OCR」。
+    private final class CountingRecognizer: TextRecognizing, @unchecked Sendable {
+        private let lock = NSLock()
+        private var calls = 0
+        let text: String
+
+        init(text: String = "RECOGNISED") { self.text = text }
+
+        var callCount: Int {
+            lock.lock()
+            defer { lock.unlock() }
+            return calls
+        }
+
+        func lines(in image: CGImage) throws -> [RecognizedLine] {
+            lock.lock()
+            calls += 1
+            lock.unlock()
+            return [RecognizedLine(text: text, bounds: CGRect(x: 0.1, y: 0.4, width: 0.5, height: 0.1))]
+        }
+    }
+
+    private func extract(
+        _ source: URL,
+        recognizer: TextRecognizing? = nil
+    ) throws -> (text: String, recognised: Int, url: URL) {
+        var settings = ConversionSettings()
+        settings.target = .pdf
+        settings.pdfTool = .extractText
+        settings.outputDirectoryPath = output.path
+        settings.perFileSubfolder = false
+        settings.filenamePattern = "out"
+
+        let outcome = try PDFToolkit.extractText(
+            url: source,
+            settings: settings,
+            recognizer: recognizer ?? VisionTextRecognizer(),
+            to: output.appendingPathComponent("out.txt")
+        )
+        let text = try String(contentsOf: outcome.url, encoding: .utf8)
+        return (text, outcome.recognisedPages, outcome.url)
+    }
+
+    // MARK: - 已有文字层
+
+    func testExistingTextLayerIsReusedWithoutCallingOCR() throws {
+        let source = try FixtureFactory.makeTextPDF(
+            pages: [["Quarterly report"], ["Second page body"]], named: "text", in: directory
+        )
+        let recogniser = CountingRecognizer()
+
+        let result = try extract(source, recognizer: recogniser)
+
+        XCTAssertTrue(result.text.contains("Quarterly report"))
+        XCTAssertTrue(result.text.contains("Second page body"))
+        XCTAssertEqual(result.recognised, 0, "有文字层就不该去识别")
+        XCTAssertEqual(recogniser.callCount, 0, "OCR 一次都不该被调用")
+    }
+
+    func testPagesAreSeparatedByABlankLine() throws {
+        let source = try FixtureFactory.makeTextPDF(
+            pages: [["first"], ["second"]], named: "two", in: directory
+        )
+        let result = try extract(source)
+
+        XCTAssertTrue(result.text.contains("first\n\nsecond"), "页与页之间应当空一行，实际：\(result.text)")
+    }
+
+    func testFileExtensionIsTxt() throws {
+        let source = try FixtureFactory.makeTextPDF(pages: [["x"]], named: "ext", in: directory)
+        let result = try extract(source)
+        XCTAssertEqual(result.url.pathExtension, "txt")
+    }
+
+    // MARK: - 没有文字层：才 OCR
+
+    func testScannedPageIsRecognised() throws {
+        let image = try FixtureFactory.makeTextImage("Scan me 42", named: "scan", in: directory)
+        let source = try PDFComposer.compose(
+            images: [
+                try XCTUnwrap(
+                    CGImageSourceCreateImageAtIndex(
+                        try XCTUnwrap(CGImageSourceCreateWithURL(image as CFURL, nil)), 0, nil
+                    )
+                )
+            ],
+            settings: ConversionSettings(),
+            to: directory.appendingPathComponent("scan.pdf")
+        )
+
+        let result = try extract(source)
+        XCTAssertTrue(result.text.contains("42"), "扫描页应当被识别出文字，实际：\(result.text)")
+        XCTAssertGreaterThan(result.recognised, 0, "应当如实报告识别了几页")
+    }
+
+    func testMixedDocumentOnlyRecognisesTheScannedPage() throws {
+        // 第一页有文字层，第二页是扫描图
+        let textPage = try FixtureFactory.makeTextPDF(pages: [["NATIVE TEXT"]], named: "native", in: directory)
+        let scannedImage = try FixtureFactory.makeTextImage("SCANNED 99", named: "p2", in: directory)
+        let image = try XCTUnwrap(
+            CGImageSourceCreateImageAtIndex(
+                try XCTUnwrap(CGImageSourceCreateWithURL(scannedImage as CFURL, nil)), 0, nil
+            )
+        )
+
+        let mixed = try PDFComposer.compose(
+            images: [image],
+            settings: ConversionSettings(),
+            to: directory.appendingPathComponent("mixed.pdf")
+        )
+        // 把带文字层那一页并进去
+        let destination = try XCTUnwrap(PDFDocument(url: mixed))
+        let source = try XCTUnwrap(PDFDocument(url: textPage))
+        if let page = source.page(at: 0) {
+            destination.insert(page, at: 0)
+            destination.write(to: mixed)
+        }
+
+        let recogniser = CountingRecognizer(text: "SCANNED 99")
+        let result = try extract(mixed, recognizer: recogniser)
+
+        XCTAssertTrue(result.text.contains("NATIVE TEXT"), "原生文字要保留")
+        XCTAssertTrue(result.text.contains("SCANNED 99"), "扫描页要识别出来")
+        XCTAssertEqual(recogniser.callCount, 1, "只该识别没有文字层的那一页")
+    }
+
+    // MARK: - 工具语义
+
+    func testToolDeclaresTheTxtExtension() {
+        XCTAssertEqual(PDFTool.extractText.outputExtension, "txt")
+        XCTAssertEqual(PDFTool.merge.outputExtension, "pdf", "其它工具仍然是 PDF")
+        XCTAssertFalse(PDFTool.extractText.usesPageSelection)
+        XCTAssertFalse(PDFTool.extractText.operatesOnWholeBatch)
+    }
+
+    func testCLINamesParse() {
+        // 命令行大小写与连字符都该认
+        XCTAssertEqual(PDFTool.parse("extract-text"), .extractText)
+        XCTAssertEqual(PDFTool.parse("extractText"), .extractText)
+        XCTAssertEqual(PDFTool.parse("EXTRACT-TEXT"), .extractText)
+        XCTAssertEqual(PDFTool.parse("ocr"), .ocr)
+        XCTAssertNil(PDFTool.parse("nonsense"))
+    }
+}

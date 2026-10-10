@@ -130,6 +130,64 @@ public enum PDFToolkit {
         return try write(extracted, to: outputURL)
     }
 
+    // MARK: - 导出文字
+
+    /// 把文档的文字写成 .txt。
+    ///
+    /// **逐页判断**：这一页已经有文字层就直接用，没有才去 OCR。
+    /// 一份「前几页是原生文字、后面是扫描件」的文档因此不会被整份重新识别，
+    /// 既快又不会把本来准确的文字换成识别结果。
+    @discardableResult
+    public static func extractText(
+        url: URL,
+        settings: ConversionSettings,
+        recognizer: TextRecognizing = VisionTextRecognizer(),
+        to outputURL: URL,
+        cancellation: CancellationFlag = CancellationFlag(),
+        onPageDone: ((Int, Int) -> Void)? = nil
+    ) throws -> (url: URL, recognisedPages: Int) {
+        // 文字用 PDFKit 读（它有 page.string），渲染用 CoreGraphics（与其它工具一致）
+        guard let source = PDFDocument(url: url), let raster = try? PDFRasterizer.open(url) else {
+            throw ConversionError.unreadablePDF()
+        }
+        let pageCount = source.pageCount
+        guard pageCount > 0 else { throw ConversionError.emptyPageRange() }
+
+        let directory = outputURL.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let target = OutputNaming.uniqueURL(outputURL)
+
+        let scale = max(settings.dpi, 72) / 72.0
+        var sections: [String] = []
+        var recognised = 0
+
+        for index in 1...pageCount {
+            if cancellation.isCancelled { throw ConversionError(Localized.text("Cancelled.")) }
+
+            let existing = (source.page(at: index - 1)?.string ?? "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if !existing.isEmpty {
+                sections.append(existing)
+            } else if let page = raster.page(at: index) {
+                // 这一页没有文字层：栅格化后识别
+                let rendered = try PDFRasterizer.render(
+                    page: page, scale: scale, background: .white, format: .png,
+                    maxPixels: settings.maxPixels
+                )
+                let lines = (try? recognizer.lines(in: rendered)) ?? []
+                recognised += 1
+                sections.append(lines.map(\.text).joined(separator: "\n"))
+            }
+
+            onPageDone?(index, pageCount)
+        }
+
+        // 页与页之间空一行：既是可读的文本，也保留了分页信息
+        let text = sections.joined(separator: "\n\n") + "\n"
+        try Data(text.utf8).write(to: target, options: .atomic)
+        return (target, recognised)
+    }
+
     // MARK: - 可搜索 PDF
 
     /// 逐页栅格化 + 识别文字 + 叠透明文字层，重建为可搜索 PDF。

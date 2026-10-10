@@ -418,6 +418,35 @@ public enum ConversionEngine {
                     duration: Date().timeIntervalSince(started)
                 )
 
+            case .extractText:
+                let folder = try outputFolder(for: first, settings: settings)
+                let pageCount = PDFRasterizer.pageCount(of: first.url)
+                let observerBox = ProgressReporter(observer: observer, fileIndex: fileIndex, fileCount: fileCount)
+                let outcome = try PDFToolkit.extractText(
+                    url: first.url,
+                    settings: settings,
+                    to: folder.appendingPathComponent(
+                        pdfFileName(for: first, settings: settings, extension: tool.outputExtension)
+                    ),
+                    cancellation: cancellation,
+                    onPageDone: { done, total in observerBox.report(completed: done, total: total) }
+                )
+                return ConversionResult(
+                    documentID: primaryID,
+                    outputFiles: [outcome.url],
+                    outputFolder: folder,
+                    producedCount: 1,
+                    duration: Date().timeIntervalSince(started),
+                    notes: outcome.recognisedPages > 0
+                        ? [
+                            Localized.text(
+                                "%d page(s) had no text layer and were recognised.",
+                                outcome.recognisedPages
+                            )
+                        ]
+                        : []
+                )
+
             case .ocr:
                 let folder = try outputFolder(for: first, settings: settings)
                 let pageCount = PDFRasterizer.pageCount(of: first.url)
@@ -542,7 +571,11 @@ public enum ConversionEngine {
     }
 
     /// 单文件 PDF 输出的文件名。
-    static func pdfFileName(for document: SourceDocument, settings: ConversionSettings) -> String {
+    static func pdfFileName(
+        for document: SourceDocument,
+        settings: ConversionSettings,
+        extension fileExtension: String = "pdf"
+    ) -> String {
         let base = OutputNaming.expand(
             pattern: settings.filenamePattern,
             documentName: document.displayName,
@@ -550,7 +583,7 @@ public enum ConversionEngine {
             pageCount: nil,
             padsPageNumbers: settings.padsPageNumbers
         )
-        return "\(base).pdf"
+        return "\(base).\(fileExtension)"
     }
 
     // MARK: - 图片 → 图片

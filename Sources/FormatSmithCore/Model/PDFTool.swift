@@ -20,6 +20,8 @@ public enum PDFTool: String, Codable, CaseIterable, Identifiable, Sendable {
     case compress
     /// 识别文字，叠一层透明文字层，做成可搜索 PDF。
     case ocr
+    /// 把文字导出成 .txt：本来就有的文字层直接用，没有的才 OCR。
+    case extractText
 
     public var id: String { rawValue }
 
@@ -33,6 +35,7 @@ public enum PDFTool: String, Codable, CaseIterable, Identifiable, Sendable {
         case .rotate: return Localized.text("Rotate")
         case .compress: return Localized.text("Compress")
         case .ocr: return Localized.text("Make searchable")
+        case .extractText: return Localized.text("Extract text")
         }
     }
 
@@ -49,6 +52,10 @@ public enum PDFTool: String, Codable, CaseIterable, Identifiable, Sendable {
             return Localized.text(
                 "Recognise the text on every page and add an invisible layer, so scans become searchable."
             )
+        case .extractText:
+            return Localized.text(
+                "Write the text to a .txt file — existing text layers are reused, scans are recognised."
+            )
         }
     }
 
@@ -61,6 +68,25 @@ public enum PDFTool: String, Codable, CaseIterable, Identifiable, Sendable {
     /// 该操作是否需要把整批输入当成一个文档处理。
     public var operatesOnWholeBatch: Bool {
         self == .merge
+    }
+
+    /// 命令行里用的名字：`extract-text` 比 `extractText` 好敲。
+    public var cliName: String {
+        switch self {
+        case .extractText: return "extract-text"
+        default: return rawValue
+        }
+    }
+
+    /// 从命令行参数解析，忽略大小写并接受连字符写法。
+    public static func parse(_ text: String) -> PDFTool? {
+        let key = text.lowercased().replacingOccurrences(of: "-", with: "")
+        return allCases.first { $0.cliName.lowercased().replacingOccurrences(of: "-", with: "") == key }
+    }
+
+    /// 产出文件的扩展名。工具箱默认产出 PDF，只有导出文字是例外。
+    public var outputExtension: String {
+        self == .extractText ? "txt" : "pdf"
     }
 
     /// 这个操作按「页码清单」工作（提取 / 重排 / 删除）。

@@ -128,6 +128,49 @@ enum FixtureFactory {
         return url
     }
 
+    /// 生成一份**带真实文字层**的 PDF（画的是字形，不是图片）。
+    ///
+    /// 用来验证「已有文字层就直接复用，不必 OCR」这条路径。
+    @discardableResult
+    static func makeTextPDF(
+        pages: [[String]],
+        size: CGSize = CGSize(width: 420, height: 200),
+        named name: String,
+        in directory: URL
+    ) throws -> URL {
+        let url = directory.appendingPathComponent("\(name).pdf")
+        var box = CGRect(origin: .zero, size: size)
+        guard let context = CGContext(url as CFURL, mediaBox: &box, nil) else {
+            throw FixtureError.cannotCreateContext
+        }
+
+        let attributes: [NSAttributedString.Key: Any] = [
+            NSAttributedString.Key(kCTFontAttributeName as String): CTFontCreateWithName(
+                "Helvetica" as CFString, 18, nil
+            ),
+            NSAttributedString.Key(kCTForegroundColorAttributeName as String): CGColor(
+                red: 0, green: 0, blue: 0, alpha: 1
+            ),
+        ]
+
+        for lines in pages {
+            var pageBox = box
+            let boxData = NSData(bytes: &pageBox, length: MemoryLayout<CGRect>.size)
+            context.beginPDFPage([kCGPDFContextMediaBox as String: boxData] as CFDictionary)
+            context.textMatrix = .identity
+            for (index, text) in lines.enumerated() {
+                let line = CTLineCreateWithAttributedString(
+                    NSAttributedString(string: text, attributes: attributes)
+                )
+                context.textPosition = CGPoint(x: 24, y: size.height - 40 - CGFloat(index) * 26)
+                CTLineDraw(line, context)
+            }
+            context.endPDFPage()
+        }
+        context.closePDF()
+        return url
+    }
+
     /// 生成一张白底黑字的图，用来给 OCR 认。
     @discardableResult
     static func makeTextImage(

@@ -345,7 +345,9 @@ report pixels × scale, PDFs report points × DPI.
 - **Office documents need LibreOffice**. It is detected, not bundled — `--check-dependencies` reports
   whether it is there. Without it, Word/Excel/PowerPoint/ODF/RTF inputs are refused with that reason;
   HTML, Markdown and plain text still convert because they go through WebKit.
-- Builds are ad-hoc signed, not notarized, so the first launch needs a right-click → Open.
+- Builds are ad-hoc signed, not notarized, so the first launch needs a right-click → Open. This is a
+  deliberate choice rather than an unfinished task: notarization needs a paid Apple Developer account,
+  and the right-click step is the whole cost of skipping it.
 
 ## License
 
