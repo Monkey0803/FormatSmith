@@ -15,15 +15,24 @@ struct QueueListView: View {
             } else {
                 header
                 Divider()
-                ScrollView {
-                    LazyVStack(spacing: 6) {
-                        ForEach(model.items) { item in
-                            QueueRowView(item: item)
-                                .padding(.horizontal, 10)
-                        }
+                // 用原生 List 的 .onMove 做拖拽排序。
+                // 之前自己用 onDrag/onDrop 拼了两次都没能拖动（先是补丁没接线，
+                // 后来是整行手势互抢），换成系统自带的机制就不再猜手势仲裁了。
+                List {
+                    ForEach(model.items) { item in
+                        QueueRowView(item: item)
+                            .listRowInsets(
+                                EdgeInsets(top: 3, leading: 10, bottom: 3, trailing: 10)
+                            )
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
                     }
-                    .padding(.vertical, 8)
+                    .onMove { offsets, destination in
+                        model.move(fromOffsets: offsets, toOffset: destination)
+                    }
                 }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
                 .background(Color(nsColor: .controlBackgroundColor).opacity(0.35))
             }
         }
@@ -158,35 +167,11 @@ struct EmptyDropZone: View {
 
 // MARK: - 队列行
 
-/// 行的拖放：把拖动项放到当前行之前。
-struct QueueRowDropDelegate: DropDelegate {
-    let target: UUID
-    let model: ConverterModel
-    @Binding var dragged: UUID?
-
-    func dropEntered(info: DropInfo) {
-        guard let dragged, dragged != target else { return }
-        model.move(id: dragged, before: target)
-    }
-
-    func dropUpdated(info: DropInfo) -> DropProposal? {
-        DropProposal(operation: .move)
-    }
-
-    func performDrop(info: DropInfo) -> Bool {
-        dragged = nil
-        return true
-    }
-}
-
 struct QueueRowView: View {
     @EnvironmentObject private var model: ConverterModel
     let item: QueueItem
 
     private var isSelected: Bool { model.selection.contains(item.id) }
-
-    /// 正在被拖动的那一项，用于区分「拖动排序」与「别的拖拽」。
-    @State private var draggedID: UUID?
 
     var body: some View {
         HStack(spacing: 12) {
@@ -204,7 +189,6 @@ struct QueueRowView: View {
             }
             Spacer(minLength: 6)
             statusBadge
-            dragHandle
             reorderButtons
             Button {
                 model.remove(id: item.id)
@@ -249,29 +233,7 @@ struct QueueRowView: View {
             )
         }
         .contextMenu { contextMenu }
-        // 拖拽排序挂在行尾的手柄上，而不是整行：
-        // 整行同时有 onTapGesture（点击选中）时，拖拽往往起不来 —— 两个手势在抢同一次按下。
-        // 手柄上没有点击手势，结构上就不可能冲突。
-        .onDrop(
-            of: [.text],
-            delegate: QueueRowDropDelegate(target: item.id, model: model, dragged: $draggedID)
-        )
         .localizedText(model.language)
-    }
-
-    /// 拖拽手柄。拖到哪一项之前，就插到它前面。
-    private var dragHandle: some View {
-        Image(systemName: "line.3.horizontal")
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(.tertiary)
-            .frame(width: 20, height: 22)
-            .contentShape(Rectangle())
-            .onDrag {
-                draggedID = item.id
-                return NSItemProvider(object: item.id.uuidString as NSString)
-            }
-            .help(Localized.text("Drag to reorder"))
-            .accessibilityLabel(Localized.text("Drag %@ to reorder", item.document.displayName))
     }
 
     /// 上移 / 下移。多图合并成一页或一册时，顺序就是正反面顺序。

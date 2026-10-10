@@ -20,16 +20,14 @@ final class QueueWiringTests: XCTestCase {
         )
     }
 
-    func testRowIsWiredForSelectionContextMenuAndDragging() throws {
+    func testRowIsWiredForSelectionAndContextMenu() throws {
         let source = try queueSource()
 
         let required: [(String, String)] = [
             (".onTapGesture", "点击选中没挂上：行还是死的"),
             ("model.select(", "点击没有落到模型的选中逻辑上"),
             (".contextMenu { contextMenu }", "右键菜单定义了却没挂到行上"),
-            ("QueueRowDropDelegate(target:", "拖拽排序的委托定义了却没挂上"),
-            (".onDrag {", "没有拖拽来源"),
-            ("dragHandle", "拖拽手柄定义了却没挂到行上"),
+            (".onMove {", "没有挂原生拖拽排序（List 的 onMove）"),
             (".accessibilityLabel", "图标按钮缺无障碍标签"),
             ("isSelected", "选中没有视觉反馈"),
         ]
@@ -39,39 +37,44 @@ final class QueueWiringTests: XCTestCase {
         }
     }
 
-    /// 只有定义没有使用的名字，说明接线断了。
-    func testHelpersAreUsedNotJustDeclared() throws {
+    /// 队列必须是原生 List + onMove。
+    ///
+    /// 自己拼手势失败了两次（补丁没接线、整行手势互抢），所以这里钉死：
+    /// 排序必须走系统机制，不要再回到 onDrag/onDrop 那一套。
+    func testReorderingUsesTheNativeListMechanism() throws {
         let source = try queueSource()
 
-        // `contextMenu` 必须出现两次：一次定义、一次作为修饰符的参数
-        let contextMenuCount = source.components(separatedBy: "contextMenu").count - 1
-        XCTAssertGreaterThanOrEqual(
-            contextMenuCount, 2,
-            "contextMenu 只出现 \(contextMenuCount) 次，多半是只定义没使用"
+        XCTAssertTrue(source.contains("List {"), "队列应当是原生 List")
+        XCTAssertTrue(source.contains(".onMove {"), "排序必须挂 onMove")
+        XCTAssertFalse(
+            source.contains("QueueRowDropDelegate"),
+            "自制的拖放委托应当已经移除，否则又是两套机制并存"
         )
-
-        let delegateCount = source.components(separatedBy: "QueueRowDropDelegate").count - 1
-        XCTAssertGreaterThanOrEqual(
-            delegateCount, 2,
-            "QueueRowDropDelegate 只出现 \(delegateCount) 次，多半是只定义没使用"
+        XCTAssertFalse(
+            source.contains("private var dragHandle"),
+            "自制拖拽手柄应当已经移除"
         )
     }
 
-    /// 拖拽必须挂在没有点击手势的地方，否则两个手势抢同一次按下，拖不起来。
-    func testDragLivesOnTheHandleNotTheWholeRow() throws {
-        let source = try queueSource()
-
-        let handleCount = source.components(separatedBy: "dragHandle").count - 1
-        XCTAssertGreaterThanOrEqual(
-            handleCount, 2, "手柄只出现 \(handleCount) 次，多半是只定义没使用"
+    /// ESC 取消全选必须挂在视图层。
+    func testEscapeIsHandledOnTheViewNotTheMenu() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let content = try String(
+            contentsOf: root.appendingPathComponent("Sources/FormatSmithApp/Views/ContentView.swift"),
+            encoding: .utf8
         )
+        XCTAssertTrue(content.contains(".onExitCommand"), "ESC 没有挂 onExitCommand")
 
-        // 行本身不该再有 onDrag：会和点击选中抢手势
-        let rowEnd = source.range(of: "private var dragHandle")?.lowerBound ?? source.endIndex
-        let rowBody = String(source[source.startIndex..<rowEnd])
+        let app = try String(
+            contentsOf: root.appendingPathComponent("Sources/FormatSmithApp/FormatSmithApp.swift"),
+            encoding: .utf8
+        )
         XCTAssertFalse(
-            rowBody.contains(".onDrag {"),
-            "行主体上还挂着 onDrag，会和 onTapGesture 抢手势（这正是拖不动的原因）"
+            app.contains(".keyboardShortcut(.escape"),
+            "Escape 不该挂在菜单上：会被系统当「取消」吃掉，菜单项收不到"
         )
     }
 

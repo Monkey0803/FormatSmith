@@ -25,6 +25,10 @@ struct ContentView: View {
                 model.add(urls: urls)
             }
         }
+        // ESC 取消全选。Escape 在菜单层会被系统当「取消」吃掉，所以走视图这一层。
+        .onExitCommand {
+            model.selection.removeAll()
+        }
         .localizedText(model.language)
         .sheet(isPresented: $model.showsAbout) {
             AboutView()

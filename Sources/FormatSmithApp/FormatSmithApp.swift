@@ -77,8 +77,9 @@ struct FormatSmithApp: App {
 
                 Divider()
 
+                // 不在这里挂 .escape：Escape 会被系统当作「取消」在菜单层就被吃掉，
+                // 菜单项收不到。真正的入口是视图上的 onExitCommand。
                 Button(Localized.text("Deselect All")) { model.selection.removeAll() }
-                    .keyboardShortcut(.escape, modifiers: [])
                     .disabled(model.selection.isEmpty)
                 Button(Localized.text("Remove Selected")) { model.removeSelected() }
                     .keyboardShortcut(.delete, modifiers: [])

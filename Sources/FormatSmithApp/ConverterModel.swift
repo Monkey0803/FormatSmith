@@ -614,6 +614,24 @@ final class ConverterModel: ObservableObject {
         recentlyRemoved = nil
     }
 
+    /// 原生列表拖拽排序（对应 SwiftUI 的 onMove）。
+    ///
+    /// `destination` 是「插入点之前的下标」，移除源项之后还要再修正一次 ——
+    /// 这是 onMove 的既有约定，照做才不会错位。
+    func move(fromOffsets offsets: IndexSet, toOffset destination: Int) {
+        guard !offsets.isEmpty else { return }
+        var items = self.items
+        let moving = offsets.sorted().map { items[$0] }
+        for index in offsets.sorted(by: >) {
+            items.remove(at: index)
+        }
+        let removedBefore = offsets.filter { $0 < destination }.count
+        let insertion = min(max(destination - removedBefore, 0), items.count)
+        items.insert(contentsOf: moving, at: insertion)
+        self.items = items
+        scheduleOutputPreview()
+    }
+
     /// 把一项移到另一项前面（拖拽排序用）。
     ///
     /// 用「移到谁前面」而不是「移到第几位」：拖动过程中目标是会变的，

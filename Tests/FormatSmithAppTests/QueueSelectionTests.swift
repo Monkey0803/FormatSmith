@@ -243,3 +243,82 @@ final class QueueReorderTests: XCTestCase {
         XCTAssertEqual(Set(model.items.map(\.name)).count, 5)
     }
 }
+
+/// 原生 onMove 的排序语义。
+@MainActor
+final class NativeMoveTests: XCTestCase {
+
+    private var directory: URL!
+
+    override func setUpWithError() throws {
+        directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("FormatSmithMove-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    }
+
+    override func tearDownWithError() throws {
+        try? FileManager.default.removeItem(at: directory)
+        UserDefaults.standard.removeObject(forKey: "FormatSmith.settings.v2")
+    }
+
+    private func makeModel(_ names: [String]) async throws -> ConverterModel {
+        let model = ConverterModel()
+        model.settings.outputDirectoryPath = directory.path
+        var urls: [URL] = []
+        for name in names {
+            let context = try BitmapContext.make(width: 50, height: 40, wantsAlpha: false)
+            context.fill(with: .white)
+            let url = directory.appendingPathComponent("\(name).png")
+            try ImageEncoder.encode(try XCTUnwrap(context.makeImage()), format: .png, quality: 1)
+                .write(to: url)
+            urls.append(url)
+        }
+        model.add(urls: urls)
+        let deadline = Date().addingTimeInterval(20)
+        while model.convertibleItems.count < names.count, Date() < deadline {
+            try await Task.sleep(nanoseconds: 100_000_000)
+        }
+        return model
+    }
+
+    /// destination 的含义是「插入到该下标之前」。
+    func testMoveDownMatchesSwiftUISemantics() async throws {
+        let model = try await makeModel(["a", "b", "c", "d"])
+        // 把 a（下标 0）拖到 c 之后：destination 是 2
+        model.move(fromOffsets: IndexSet(integer: 0), toOffset: 2)
+        XCTAssertEqual(model.items.map(\.name), ["b", "a", "c", "d"])
+    }
+
+    func testMoveUp() async throws {
+        let model = try await makeModel(["a", "b", "c", "d"])
+        // 把 d（下标 3）拖到最前：destination 是 0
+        model.move(fromOffsets: IndexSet(integer: 3), toOffset: 0)
+        XCTAssertEqual(model.items.map(\.name), ["d", "a", "b", "c"])
+    }
+
+    func testMoveToTheEnd() async throws {
+        let model = try await makeModel(["a", "b", "c"])
+        model.move(fromOffsets: IndexSet(integer: 0), toOffset: 3)
+        XCTAssertEqual(model.items.map(\.name), ["b", "c", "a"])
+    }
+
+    func testMovingMultipleRows() async throws {
+        let model = try await makeModel(["a", "b", "c", "d", "e"])
+        model.move(fromOffsets: IndexSet([1, 2]), toOffset: 4)
+        XCTAssertEqual(model.items.map(\.name), ["a", "d", "b", "c", "e"])
+    }
+
+    func testMovingNowhereKeepsOrder() async throws {
+        let model = try await makeModel(["a", "b", "c"])
+        model.move(fromOffsets: IndexSet(integer: 1), toOffset: 1)
+        XCTAssertEqual(model.items.map(\.name), ["a", "b", "c"], "原位插入不该改变顺序")
+    }
+
+    func testNothingIsLost() async throws {
+        let model = try await makeModel(["a", "b", "c", "d"])
+        model.move(fromOffsets: IndexSet(integer: 0), toOffset: 4)
+        model.move(fromOffsets: IndexSet(integer: 2), toOffset: 0)
+        XCTAssertEqual(model.items.count, 4)
+        XCTAssertEqual(Set(model.items.map(\.name)).count, 4)
+    }
+}
