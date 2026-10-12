@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-10-10
+
+### Added
+
+- **The CLI prints notes.** Choosing *Text (.txt)* on a scan reports "2 page(s) had no text layer and
+  were recognised" in the app — and now in scripts too. A note the interface shows but the CLI hides is
+  the same tool wearing two faces, and these notes are often how you tell whether the run did what you
+  meant.
+- **A warning before a very large output.** A 108-megapixel image needs roughly 1.3 GB of memory
+  (measured: 1259 MB peak converting a 108 MP JPEG). Outputs above 40 MP now say so, and suggest a
+  longest edge.
+- **The CLI accepts folders** (`--convert ~/Pictures`), using the same rules as the app.
+
+### Fixed
+
+- **Folders ignored their subfolders — in the app as well as the CLI.** The enumeration read
+  `while let child = …, isSupported(child)`, and a `while let` loop **ends** when its condition fails:
+  the walk stopped at the first entry it did not recognise (a subdirectory), so files below the top
+  level were never seen. Dragging a folder into the app has always missed subfolders, silently.
+- **Preset descriptions lost their Chinese.** Making the preset names store an English key (so they
+  follow the language setting) also hid those keys from the localization completeness scan, and the
+  next regeneration of the translation table deleted all 20 entries. The scan now covers that entry
+  point — the point of the test being that a table rebuilt from usage must not silently drop text.
+
 ## [1.6.0] - 2026-10-10
 
 ### Added
@@ -344,7 +368,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as output formats. Their size rules are undocumented and inconsistent; ICNS, for example, rejects
   64×64 and 1024×1024 while accepting 48×48.
 
-[Unreleased]: https://github.com/Monkey0803/FormatSmith/compare/v1.6.0...HEAD
+[Unreleased]: https://github.com/Monkey0803/FormatSmith/compare/v1.7.0...HEAD
+[1.7.0]: https://github.com/Monkey0803/FormatSmith/releases/tag/v1.7.0
 [1.6.0]: https://github.com/Monkey0803/FormatSmith/releases/tag/v1.6.0
 [1.5.0]: https://github.com/Monkey0803/FormatSmith/releases/tag/v1.5.0
 [1.4.0]: https://github.com/Monkey0803/FormatSmith/releases/tag/v1.4.0
