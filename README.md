@@ -1,6 +1,6 @@
-# FormatSmith
-
 **English** · [简体中文](README.zh-Hans.md)
+
+# FormatSmith
 
 [![CI](https://github.com/Monkey0803/FormatSmith/actions/workflows/ci.yml/badge.svg)](https://github.com/Monkey0803/FormatSmith/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/Monkey0803/FormatSmith)](https://github.com/Monkey0803/FormatSmith/releases/latest)
@@ -79,6 +79,20 @@ The format list is not hardcoded. It is read from ImageIO at runtime, so a macOS
 format adds it here — and the app tells you *why* something is unavailable instead of failing
 silently. WebP and JPEG XL, for instance, can be read but not written by macOS, so they are never
 offered as outputs.
+- **A queue you can actually manage**: click to select, ⌘-click to add, ⇧-click for a range, ⌘A for
+  all, ⌫ to remove the selection, and drag a row to reorder it. Right-click for Show in Finder, Copy
+  File Name, Remove, or Show Output in Finder. Removing is undoable, and undo puts the files back where
+  they were rather than at the end.
+- **Appearance**: follow the system, or pin Light or Dark. The choice is remembered, and it affects
+  only the window — never the pixels you export.
+- **Keyboard shortcuts** for the things you do often: `⌘O` choose files, `⌘⏎` convert, `⌘.` cancel,
+  `⌘1`–`⌘0` apply the ten presets, `⌘Z` undo a removal, `Esc` clear the selection. *Keyboard
+  Shortcuts* in the Help menu lists them all.
+- **A notification when a long run finishes.** A few hundred scanned pages take minutes; you should
+  not have to keep watching the window to find out it is done.
+- **The queue reports what came out** — `2.4 MB → 380 KB` — so you can see whether the result is
+  genuinely smaller, not merely different.
+
 
 ## Requirements
 
