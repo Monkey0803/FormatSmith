@@ -50,6 +50,37 @@ done < <(grep -oE '\-\-[a-z][a-z-]+' "$EN" | sort -u)
 
 [ "$missing" = 0 ] && pass "all CLI flags kept verbatim"
 
+# 站内锚点必须真的存在。
+# 翻译标题会顺带弄坏 `](#some-heading)` 这类链接：标题变成中文，锚点就不再是英文了。
+# 死链点不动，而且没有任何报错 —— 只能靠查。
+check_anchors() {
+    local file="$1"
+    # 用 python 做真正的比对：锚点规则（大小写、空格转连字符、去标点）用 shell 拼不准确
+    python3 - "$file" <<'PY'
+import re, sys
+text = open(sys.argv[1], encoding='utf-8').read()
+links = set(re.findall(r'\]\(#([^)]+)\)', text))
+headings = re.findall(r'^#{1,6}\s+(.+?)\s*$', text, re.M)
+def slug(h):
+    s = h.strip().lower()
+    s = re.sub(r'[^\w\s\u4e00-\u9fff-]', '', s)
+    return re.sub(r'\s+', '-', s)
+slugs = {slug(h) for h in headings}
+dead = sorted(links - slugs)
+if dead:
+    print("DEAD " + ", ".join("#" + d for d in dead))
+PY
+}
+
+for doc in "$EN" "$ZH"; do
+    result="$(check_anchors "$doc")"
+    if [ -n "$result" ]; then
+        fail "$(basename "$doc") has a dead in-page link: ${result#DEAD }"
+    else
+        pass "$(basename "$doc") in-page links resolve"
+    fi
+done
+
 grep -q 'README.zh-Hans.md' "$EN" || fail "English README does not link to the Chinese one"
 grep -q 'README.md' "$ZH" || fail "Chinese README does not link back to the English one"
 
