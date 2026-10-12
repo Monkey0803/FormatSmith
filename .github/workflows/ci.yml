@@ -57,6 +57,10 @@ jobs:
       - name: CLI smoke test
         run: ./scripts/smoke-test-cli.sh
 
+      # 英文 README 是源、中文是译本：结构漂移没有症状，只有中文读者会看到过期的功能
+      - name: Check the READMEs stay in sync
+        run: ./scripts/check-docs.sh
+
       - name: Keep the bundle for inspection when something fails
         if: failure()
         uses: actions/upload-artifact@v7

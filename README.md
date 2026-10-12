@@ -1,5 +1,7 @@
 # FormatSmith
 
+**English** · [简体中文](README.zh-Hans.md)
+
 [![CI](https://github.com/Monkey0803/FormatSmith/actions/workflows/ci.yml/badge.svg)](https://github.com/Monkey0803/FormatSmith/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/Monkey0803/FormatSmith)](https://github.com/Monkey0803/FormatSmith/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
